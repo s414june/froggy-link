@@ -219,6 +219,9 @@ export const useLinks = () => {
   }
 
   const saveLink = async () => {
+    if (saving.value) {
+      return
+    }
     errorMessage.value = ''
 
     if (!formUrl.value.trim()) {
@@ -248,10 +251,16 @@ export const useLinks = () => {
       if (existingItem) {
         const mergedTags = normalizeTags([...existingItem.tags, ...inputTags])
         const hasTagDiff = mergedTags.length !== normalizeTags(existingItem.tags).length
+        const metadata = !existingItem.imageUrl
+          ? await fetchLinkMetadata(normalizedUrl)
+          : null
 
-        if (hasTagDiff) {
+        if (hasTagDiff || metadata?.title || metadata?.description || metadata?.imageUrl) {
           const updatedItem: LinkItem = {
             ...existingItem,
+            title: metadata?.title || existingItem.title,
+            description: metadata?.description || existingItem.description,
+            imageUrl: metadata?.imageUrl || existingItem.imageUrl,
             tags: mergedTags
           }
 

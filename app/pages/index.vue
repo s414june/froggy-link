@@ -262,18 +262,33 @@ watch([filteredLinks, allTags, formTags, selectedTagFilters], async () => {
   updateTagOverflow()
 }, { deep: true })
 
+const receiveSharedLink = async () => {
+  if (!hydrateFromShareQuery(route.query)) {
+    return
+  }
+
+  const query = { ...route.query }
+  delete query.url
+  delete query.text
+  delete query.title
+  await navigateTo({ path: route.path, query, hash: route.hash }, { replace: true })
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+  showShareHint('設定標籤並按下新增！')
+}
+
+watch(() => route.query, () => {
+  if (import.meta.client) {
+    void receiveSharedLink()
+  }
+})
+
 onMounted(async () => {
   loadTagOrderMap()
   window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.addEventListener('appinstalled', handleAppInstalled)
   window.addEventListener('resize', updateTagOverflow)
   await loadLinks()
-  const shouldImportSharedLink = hydrateFromShareQuery(route.query)
-  if (shouldImportSharedLink) {
-    await navigateTo(route.path, { replace: true })
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-    showShareHint('設定標籤並按下新增！')
-  }
+  await receiveSharedLink()
   await nextTick()
   updateTagOverflow()
 })

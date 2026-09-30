@@ -5,7 +5,7 @@ Nuxt 4 + PWA 的個人連結整理工具，定位為簡單版收藏 App。
 ## 目前功能
 
 - 以貼上網址或 Android 分享連結（Web Share Target）新增項目
-- Android 可從任意 App 直接「分享至 Froggy Link」，會自動新增連結
+- Android 可從其他 App「分享至 Froggy Link」，帶入網址後設定標籤並按「新增」
 - 使用者可手動建立標籤，一個連結可綁定多個標籤
 - 新增連結時自動嘗試抓取 metadata（圖片、標題、描述）
 - 可用標籤篩選清單
@@ -44,5 +44,14 @@ npm run preview
 ## Metadata 抓取說明
 
 - 由 Nuxt 內建 API (`/api/metadata`) 代抓目標頁面 meta（`og:*` / `twitter:*` / `description`）
-- 若目標網站 meta 不完整，會退而嘗試 `noembed` 支援來源
+- YouTube 影片（包含 Android App 分享的 `youtu.be`、Shorts 與直播連結）優先透過 YouTube oEmbed 取得標題與縮圖
+- 若目標網站 meta 不完整，會透過 `noembed` 補齊缺少的欄位；只有標題時也會繼續嘗試取得縮圖
+- 短網址重新導向後，以最終頁面網址解析相對圖片路徑
+- 已儲存但沒有縮圖的連結，再次新增會重試預覽並保留原有標籤
 - 若仍無法取得，會以網址網域當作標題顯示
+- 預覽需要網路與可執行 Nuxt API 的部署環境；純靜態 `generate` 無法提供 `/api/metadata`
+- 私人內容、需登入或限制擷取的網站可能無法提供預覽；不會繞過來源網站的存取限制
+
+## 驗證
+
+使用 Node.js 22.18+ 或 24 執行 `npm test`，驗證 YouTube 分享網址、縮圖備援與重新導向處理。正式建置使用 `npm run build`。
