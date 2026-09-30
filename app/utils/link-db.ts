@@ -1,4 +1,5 @@
 import type { LinkItem } from '~/types/link'
+import { toStoredLink } from '~/utils/link-storage'
 
 const DB_NAME = 'froggy-link-db'
 const DB_VERSION = 1
@@ -52,12 +53,13 @@ export const readAllLinks = async () => {
 }
 
 export const upsertLink = async (link: LinkItem) => {
+  const storedLink = toStoredLink(link)
   const db = await openDatabase()
 
   try {
     const transaction = db.transaction(LINK_STORE, 'readwrite')
     const store = transaction.objectStore(LINK_STORE)
-    await runRequest(store.put(link))
+    await runRequest(store.put(storedLink))
   }
   finally {
     db.close()
