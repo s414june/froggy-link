@@ -34,6 +34,7 @@ npm run preview
 - 正式環境需透過 HTTPS（Vercel 預設符合）
 - manifest 需提供至少 `192x192` 與 `512x512` 的 PNG 圖示（本專案在 `public/icons`）
 - 若更新過 service worker 或 manifest，請在瀏覽器 DevTools 清除舊快取後再重整驗證
+- 已啟用自動更新：偵測到新版 service worker 會自動啟用並重新整理頁面，且清理過期快取
 
 ## 樣式客製化
 

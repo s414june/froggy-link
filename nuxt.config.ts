@@ -8,8 +8,8 @@ export default defineNuxtConfig({
     registerType: 'autoUpdate',
     manifest: {
       id: '/',
-      name: '🐸 Froggy Link',
-      short_name: '🐸 Froggy Link',
+      name: 'Froggy Link',
+      short_name: 'Froggy Link',
       description: '手動整理連結、標籤分類與離線儲存的簡易 PWA',
       theme_color: '#0f172a',
       background_color: '#0f172a',
@@ -48,6 +48,9 @@ export default defineNuxtConfig({
       installPrompt: true
     },
     workbox: {
+      cleanupOutdatedCaches: true,
+      clientsClaim: true,
+      skipWaiting: true,
       globPatterns: ['**/*.{js,css,html,png,svg,ico,json}']
     },
     devOptions: {
