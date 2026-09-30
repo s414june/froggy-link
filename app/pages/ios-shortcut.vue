@@ -39,7 +39,7 @@ const copyInstallLink = async () => {
         <li>確認網址、選擇標籤，再按「新增」儲存收藏。</li>
       </ol>
       <p class="mt-4">找不到分享動作時，也可以直接在「捷徑」App 執行「分享到 Froggy Link」，依提示貼上完整網址。一次會帶入第一個網址。</p>
-      <p class="mt-3 rounded-lg bg-slate-100 p-3">捷徑會開啟瀏覽器網站，未必開啟主畫面的 PWA。兩者的收藏不會自動同步；若要收藏到 PWA，請複製原始網址，開啟 PWA 後貼上新增。</p>
+      <p class="mt-3 rounded-lg bg-slate-100 p-3">捷徑使用「打開 URL」，會開啟瀏覽器，無法可靠指定已安裝的 PWA。要存進原本的 App：在帶入連結的網頁點「複製網址，到 App 收藏」，回到主畫面開啟 Froggy Link，點「貼上連結」，再按「新增」。瀏覽器與 PWA 的收藏不會自動同步。</p>
     </section>
 
     <section class="mt-6 rounded-2xl border border-slate-300 bg-white p-5">

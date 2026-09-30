@@ -39,6 +39,34 @@ const {
   loadTagOrderMap
 } = useLinks()
 
+const isIosBrowser = ref(false)
+const receivedSharedLink = ref(false)
+const clipboardMessage = ref('')
+
+const copyLinkForPwa = async () => {
+  try {
+    await navigator.clipboard.writeText(formUrl.value)
+    clipboardMessage.value = '已複製。請回到主畫面開啟 Froggy Link App，點「貼上連結」後再按「新增」。'
+  }
+  catch {
+    clipboardMessage.value = '無法自動複製，請長按網址欄位複製，再到主畫面的 Froggy Link App 貼上。'
+  }
+}
+
+const pasteLink = async () => {
+  try {
+    const text = await navigator.clipboard.readText()
+    if (!hydrateFromShareQuery({ text })) {
+      clipboardMessage.value = '剪貼簿中找不到網址，請先複製要收藏的連結。'
+      return
+    }
+    clipboardMessage.value = '已帶入連結，確認後按「新增」儲存在這裡。'
+  }
+  catch {
+    clipboardMessage.value = '請長按網址欄位，選擇「貼上」。'
+  }
+}
+
 const editingId = ref('')
 const failedPreviewImages = ref<Record<string, string>>({})
 const retryPreview = async (id: string) => {
@@ -247,6 +275,7 @@ const receiveSharedLink = async () => {
     return
   }
 
+  receivedSharedLink.value = true
   const query = { ...route.query }
   delete query.url
   delete query.text
@@ -263,6 +292,11 @@ watch(() => route.query, () => {
 })
 
 onMounted(async () => {
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const standalone = window.matchMedia('(display-mode: standalone)').matches
+    || (navigator as Navigator & { standalone?: boolean }).standalone === true
+  isIosBrowser.value = ios && !standalone
   loadTagOrderMap()
   window.addEventListener('resize', updateTagOverflow)
   await loadLinks()
@@ -321,9 +355,15 @@ onBeforeUnmount(() => {
 
       <section class="rounded-xl border border-[#000000] bg-surface p-4 shadow-sm md:p-5">
         <form class="space-y-4" @submit.prevent="saveLink">
+          <div v-if="isIosBrowser && receivedSharedLink" class="rounded-lg border border-primary/30 bg-primary/5 p-3 text-base leading-relaxed">
+            <p class="font-semibold">目前開啟的是瀏覽器版</p>
+            <p class="mt-1">若要存進已安裝的 Froggy Link App，請複製網址，再從主畫面開啟 App 貼上新增。這裡的收藏不會自動同步到 App。</p>
+            <button type="button" :disabled="!formUrl" class="mt-2 rounded-lg bg-primary px-3 py-2 font-medium text-white disabled:opacity-50" @click="copyLinkForPwa">複製網址，到 App 收藏</button>
+          </div>
           <div class="space-y-1">
             <input
               id="url-input"
+              aria-label="要收藏的網址"
               v-model="formUrl"
               type="url"
               required
@@ -331,6 +371,8 @@ onBeforeUnmount(() => {
               class="w-full rounded-lg border border-slate-300 bg-surface-soft px-3 py-2 text-sm outline-none focus:border-primary"
             >
           </div>
+          <button type="button" class="rounded-lg border border-slate-300 px-3 py-2 text-base text-primary hover:bg-slate-50" @click="pasteLink">貼上連結</button>
+          <p v-if="clipboardMessage" role="status" class="text-base text-slate-600">{{ clipboardMessage }}</p>
           <div class="space-y-2">
             <div class="flex items-center gap-2">
               <div
@@ -482,7 +524,7 @@ onBeforeUnmount(() => {
             載入中...
           </p>
 
-          <ul v-else-if="filteredLinks.length > 0" class="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto pr-1 min-[480px]:grid-cols-2">
+          <ul v-else-if="filteredLinks.length > 0" class="grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start items-start gap-3 overflow-y-auto pr-1 min-[480px]:grid-cols-2">
             <li
               v-for="item in filteredLinks"
               :key="item.id"
