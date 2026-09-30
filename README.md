@@ -5,6 +5,7 @@ Nuxt 4 + PWA 的個人連結整理工具，定位為簡單版收藏 App。
 ## 目前功能
 
 - 以貼上網址或 Android 分享連結（Web Share Target）新增項目
+- Android 可從任意 App 直接「分享至 Froggy Link」，會自動新增連結
 - 使用者可手動建立標籤，一個連結可綁定多個標籤
 - 新增連結時自動嘗試抓取 metadata（圖片、標題、描述）
 - 可用標籤篩選清單

@@ -254,7 +254,15 @@ onMounted(async () => {
   window.addEventListener('appinstalled', handleAppInstalled)
   window.addEventListener('resize', updateTagOverflow)
   await loadLinks()
-  hydrateFromShareQuery(route.query)
+  const shouldImportSharedLink = hydrateFromShareQuery(route.query)
+  if (shouldImportSharedLink) {
+    await saveLink()
+
+    if (!errorMessage.value) {
+      await navigateTo(route.path, { replace: true })
+      installStatusMessage.value = '已從 Android 分享新增連結。'
+    }
+  }
   await nextTick()
   updateTagOverflow()
 })

@@ -29,6 +29,11 @@ const parseQueryValue = (value: string | string[] | null | undefined) => {
   return Array.isArray(value) ? value[0] ?? '' : value
 }
 
+const extractFirstUrl = (raw: string) => {
+  const match = raw.match(/https?:\/\/[^\s]+/i)
+  return match?.[0] ?? ''
+}
+
 const normalizeUrl = (rawUrl: string) => {
   const trimmed = rawUrl.trim()
   const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)
@@ -328,10 +333,16 @@ export const useLinks = () => {
 
   const hydrateFromShareQuery = (query: LocationQuery) => {
     const sharedUrl = parseQueryValue(query.url)
+    const sharedText = parseQueryValue(query.text)
+    const fallbackUrl = extractFirstUrl(sharedText)
+    const targetUrl = sharedUrl || fallbackUrl
 
-    if (sharedUrl) {
-      formUrl.value = sharedUrl
+    if (targetUrl) {
+      formUrl.value = targetUrl
+      return true
     }
+
+    return false
   }
 
   return {
