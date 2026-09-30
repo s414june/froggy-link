@@ -53,7 +53,7 @@ export default defineNuxtConfig({
       }
     },
     client: {
-      installPrompt: true
+      installPrompt: false
     },
     workbox: {
       cleanupOutdatedCaches: true,

@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { useLinks } from '~/composables/use-links'
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed', platform: string }>
-}
+const {
+  canInstall: canInstallPwa,
+  showBanner: showInstallBanner,
+  isInstalled: isPwaInstalled,
+  installing: isInstallingPwa,
+  statusMessage: installStatusMessage,
+  install: triggerPwaInstall,
+  dismiss: dismissInstallBanner
+} = useNuxtApp().$pwaInstall
 
 const route = useRoute()
 useHead({
@@ -44,10 +49,7 @@ const isTagPickerOpen = ref(false)
 const tagPickerTitle = ref('')
 const tagPickerMode = ref<'filter' | 'form-known' | 'form-selected'>('filter')
 const tagPickerItems = ref<string[]>([])
-const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null)
-const installStatusMessage = ref('')
 const shareHintMessage = ref('')
-const canInstallPwa = computed(() => Boolean(deferredInstallPrompt.value))
 const tagRowRefs = ref<Record<string, HTMLElement | null>>({})
 const tagOverflowById = ref<Record<string, boolean>>({})
 const formKnownTagsRowRef = ref<HTMLElement | null>(null)
@@ -148,35 +150,6 @@ const formatDate = (timestamp: number) => {
     hour: '2-digit',
     minute: '2-digit'
   })
-}
-
-const handleBeforeInstallPrompt = (event: Event) => {
-  event.preventDefault()
-  deferredInstallPrompt.value = event as BeforeInstallPromptEvent
-  installStatusMessage.value = ''
-}
-
-const handleAppInstalled = () => {
-  deferredInstallPrompt.value = null
-  installStatusMessage.value = '已安裝到主畫面。'
-}
-
-const triggerPwaInstall = async () => {
-  installStatusMessage.value = ''
-
-  if (!deferredInstallPrompt.value) {
-    installStatusMessage.value = '此裝置目前無法顯示原生安裝提示。'
-    return
-  }
-
-  const promptEvent = deferredInstallPrompt.value
-  deferredInstallPrompt.value = null
-
-  await promptEvent.prompt()
-  const choiceResult = await promptEvent.userChoice
-  installStatusMessage.value = choiceResult.outcome === 'accepted'
-    ? '安裝流程已啟動。'
-    : '你已取消安裝。'
 }
 
 const showShareHint = (message: string) => {
@@ -284,8 +257,6 @@ watch(() => route.query, () => {
 
 onMounted(async () => {
   loadTagOrderMap()
-  window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-  window.addEventListener('appinstalled', handleAppInstalled)
   window.addEventListener('resize', updateTagOverflow)
   await loadLinks()
   await receiveSharedLink()
@@ -294,8 +265,6 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-  window.removeEventListener('appinstalled', handleAppInstalled)
   window.removeEventListener('resize', updateTagOverflow)
   if (shareHintTimer !== null) {
     window.clearTimeout(shareHintTimer)
@@ -307,8 +276,9 @@ onBeforeUnmount(() => {
   <main class="min-h-screen bg-bg text-text">
     <div class="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-6">
       <header class="flex items-center justify-between gap-3">
-        <h1 class="text-2xl font-bold md:text-3xl">
-          🐸 Froggy Link
+        <h1 class="flex items-center gap-2 text-2xl font-bold md:text-3xl">
+          <img src="/icons/icon-192.png" alt="" width="40" height="40" class="h-10 w-10 shrink-0">
+          Froggy Link
         </h1>
         <button
           type="button"
@@ -318,6 +288,29 @@ onBeforeUnmount(() => {
           設定
         </button>
       </header>
+
+      <section
+        v-if="showInstallBanner"
+        aria-labelledby="install-banner-title"
+        class="flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4"
+      >
+        <img src="/icons/icon-192.png" alt="" width="48" height="48" class="h-12 w-12 shrink-0 rounded-xl">
+        <div class="min-w-0 flex-1">
+          <h2 id="install-banner-title" class="font-semibold text-slate-900">安裝 Froggy Link App</h2>
+          <p class="mt-1 text-sm text-slate-600">加到主畫面，隨時收藏連結，也能從其他 App 分享至這裡。</p>
+        </div>
+        <div class="flex w-full justify-end gap-2 sm:w-auto">
+          <button type="button" class="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-100" @click="dismissInstallBanner">
+            暫時不要
+          </button>
+          <button type="button" class="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-hover" @click="triggerPwaInstall">
+            安裝 App
+          </button>
+        </div>
+      </section>
+      <p v-if="installStatusMessage && !isSettingsOpen" role="status" class="text-sm text-slate-600">
+        {{ installStatusMessage }}
+      </p>
 
       <section class="rounded-xl border border-[#000000] bg-surface p-4 shadow-sm md:p-5">
         <form class="space-y-4" @submit.prevent="saveLink">
@@ -638,6 +631,7 @@ onBeforeUnmount(() => {
         <button
           type="button"
           class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-left text-sm text-slate-800 transition hover:bg-slate-100"
+          :disabled="isInstallingPwa || isPwaInstalled"
           @click="triggerPwaInstall"
         >
           <span>加到主畫面</span>
@@ -645,11 +639,11 @@ onBeforeUnmount(() => {
             class="ml-2 text-xs"
             :class="canInstallPwa ? 'text-green-700' : 'text-slate-500'"
           >
-            {{ canInstallPwa ? '可安裝' : '不可用' }}
+            {{ isPwaInstalled ? '已安裝' : isInstallingPwa ? '安裝中…' : canInstallPwa ? '可安裝' : '查看方式' }}
           </span>
         </button>
 
-        <p v-if="installStatusMessage" class="mt-3 text-xs text-slate-600">
+        <p v-if="installStatusMessage" role="status" class="mt-3 text-xs text-slate-600">
           {{ installStatusMessage }}
         </p>
       </div>

@@ -31,6 +31,10 @@ npm run preview
 
 ## PWA 安裝注意事項
 
+- Android 瀏覽器確認可安裝後，首頁會顯示安裝橫幅；點「安裝 App」才會開啟系統安裝視窗
+- 點「暫時不要」或取消系統提示後，同一個分頁工作階段不再自動提示；設定仍保留安裝入口
+- 已安裝並以 App 模式開啟、iOS 與桌面瀏覽器不顯示 Android 安裝橫幅；設定會提供可用的安裝按鈕或手動安裝說明
+- 安裝提示由瀏覽器決定何時提供，未觸發 `beforeinstallprompt` 時不會顯示無法使用的橫幅按鈕
 - 正式環境需透過 HTTPS（Vercel 預設符合）
 - manifest 需提供至少 `192x192` 與 `512x512` 的 PNG 圖示（本專案在 `public/icons`）
 - 若更新過 service worker 或 manifest，請在瀏覽器 DevTools 清除舊快取後再重整驗證
