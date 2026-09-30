@@ -61,3 +61,22 @@ npm run preview
 ## 驗證
 
 使用 Node.js 22.18+ 或 24 執行 `npm test`，驗證 YouTube 分享網址、縮圖備援與重新導向處理。正式建置使用 `npm run build`。
+
+## iPhone／iPad 分享捷徑
+
+設定中的「安裝分享捷徑」會開啟 `/ios-shortcut`，提供加入捷徑、複製公開安裝連結與操作說明。
+
+- 公開安裝連結：https://www.icloud.com/shortcuts/30f872e0ee2848cfabe004966c461d1f
+- 固定送往 `https://froggy-link.vercel.app/?url=`；網址先編碼，保留原本的查詢參數
+- 接收分享表單中的 URL、文字、Safari 網頁；沒有輸入時提示貼上網址；多個網址取第一個
+- 使用者仍需在網站按「新增」儲存。iOS 瀏覽器與主畫面 PWA 的本機收藏不會自動同步
+- 備援檔案：`public/shortcuts/share-to-froggy-link.shortcut`，已透過 Apple 簽署供任何人匯入
+
+維護捷徑（需要 macOS）：
+
+```bash
+python3 scripts/build-ios-shortcut.py
+shortcuts sign --mode anyone --input shortcuts/share-to-froggy-link.unsigned.shortcut --output public/shortcuts/share-to-froggy-link.shortcut
+```
+
+`shortcuts/share-to-froggy-link.plist` 是可閱讀的動作定義。修改後請重新簽署、匯入「捷徑」App、命名為「分享到 Froggy Link」，測試後使用分享選單的「拷貝 iCloud 連結」建立新版本，再更新 `app/pages/ios-shortcut.vue` 的 `installUrl` 與本文件。既有 iCloud 分享連結不會跟著原始碼更新。

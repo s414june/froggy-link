@@ -49,18 +49,6 @@ const editTagInput = ref('')
 const editTags = ref<string[]>([])
 const activeTab = ref<'links' | 'map'>('links')
 const isSettingsOpen = ref(false)
-const shortcutUrlPrefix = ref('')
-const shortcutCopyMessage = ref('')
-
-const copyShortcutUrl = async () => {
-  try {
-    await navigator.clipboard.writeText(shortcutUrlPrefix.value)
-    shortcutCopyMessage.value = '已複製網址前綴，請貼到捷徑的「文字」動作。'
-  }
-  catch {
-    shortcutCopyMessage.value = '無法自動複製，請長按下方網址欄位並複製。'
-  }
-}
 const isTagModalOpen = ref(false)
 const modalTags = ref<string[]>([])
 const modalTagTitle = ref('')
@@ -275,7 +263,6 @@ watch(() => route.query, () => {
 })
 
 onMounted(async () => {
-  shortcutUrlPrefix.value = `${new URL(useRuntimeConfig().app.baseURL, window.location.origin).href}?url=`
   loadTagOrderMap()
   window.addEventListener('resize', updateTagOverflow)
   await loadLinks()
@@ -676,33 +663,11 @@ onBeforeUnmount(() => {
           {{ installStatusMessage }}
         </p>
 
-        <details class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
-          <summary class="cursor-pointer font-semibold text-slate-900">iPhone／iPad 分享捷徑教學</summary>
-          <div class="mt-3 space-y-4">
-            <p>建立一次「分享到 Froggy Link」捷徑，就能從 YouTube、Safari 等 App 的分享選單帶入連結。</p>
-            <p class="rounded-lg border border-amber-200 bg-amber-50 p-3">
-              捷徑會開啟瀏覽器網頁，不保證開啟主畫面的 PWA。兩者的收藏不會自動同步；若要存進 PWA，請複製連結後開啟 PWA 貼上新增。
-            </p>
-            <ol class="list-decimal space-y-3 pl-5">
-              <li>打開 iPhone／iPad 的「捷徑」App，按「＋」新增捷徑，命名為「分享到 Froggy Link」。</li>
-              <li>在捷徑的「詳細資訊」啟用「在分享表單中顯示」，接收類型選擇「URL」和「文字」。</li>
-              <li>加入「從輸入取得 URL」（Get URLs from Input），輸入選擇「捷徑輸入」。再加入「從列表取得項目」，選擇「第一個項目」。</li>
-              <li>加入「URL 編碼」（URL Encode），模式選「編碼」，輸入使用上一個動作的網址。</li>
-              <li>
-                加入「文字」動作，貼上下方網址前綴；在最後的「=」後插入上一個「URL 編碼」的結果變數，不要換行或加入空白。
-                <label for="shortcut-url-prefix" class="mt-2 block font-medium">此網站的網址前綴</label>
-                <input id="shortcut-url-prefix" :value="shortcutUrlPrefix" readonly class="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-base" @focus="($event.target as HTMLInputElement).select()">
-                <button type="button" class="mt-2 rounded-lg bg-primary px-3 py-2 text-base font-medium text-white hover:bg-primary-hover" @click="copyShortcutUrl">複製網址前綴</button>
-                <p v-if="shortcutCopyMessage" role="status" class="mt-2 text-base">{{ shortcutCopyMessage }}</p>
-                <p class="mt-2">組合方式：<code class="break-all">{{ shortcutUrlPrefix }}[URL 編碼的結果變數]</code>。方括號部分要插入變數，不是手動輸入這段文字。</p>
-              </li>
-              <li>最後加入「打開 URL」（Open URLs），輸入選擇剛才的「文字」，然後儲存捷徑。</li>
-              <li>到 YouTube 或 Safari 按「分享」，選擇「分享到 Froggy Link」。網頁帶入連結後，設定標籤並按「新增」。首次執行若詢問權限，依畫面提示允許。</li>
-            </ol>
-            <p>找不到捷徑時，請查看分享表單下方的動作列表，並確認已啟用「在分享表單中顯示」。各 iOS 版本的動作名稱可能略有不同。</p>
-            <a href="https://support.apple.com/zh-tw/guide/shortcuts/apd163eb9f95/ios" target="_blank" rel="noopener noreferrer" class="inline-block text-primary underline underline-offset-2">Apple 官方：從其他 App 執行捷徑</a>
-          </div>
-        </details>
+        <section class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
+          <h3 class="font-semibold text-slate-900">iPhone／iPad 分享捷徑</h3>
+          <p class="mt-2">直接加入已設定好的「分享到 Froggy Link」，從其他 App 的分享選單帶入連結，也能將安裝連結分享給朋友。</p>
+          <NuxtLink to="/ios-shortcut" class="mt-3 inline-block rounded-lg bg-primary px-4 py-2 font-medium text-white hover:bg-primary-hover">安裝分享捷徑</NuxtLink>
+        </section>
       </div>
     </div>
 
