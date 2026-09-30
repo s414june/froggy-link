@@ -7,6 +7,7 @@ export default defineNuxtConfig({
   pwa: {
     registerType: 'autoUpdate',
     manifest: {
+      id: '/',
       name: '🐸 Froggy Link',
       short_name: '🐸 Froggy Link',
       description: '手動整理連結、標籤分類與離線儲存的簡易 PWA',
@@ -17,9 +18,20 @@ export default defineNuxtConfig({
       scope: '/',
       icons: [
         {
-          src: '/favicon.ico',
-          sizes: '64x64 32x32 24x24 16x16',
-          type: 'image/x-icon'
+          src: '/icons/icon-192.png',
+          sizes: '192x192',
+          type: 'image/png'
+        },
+        {
+          src: '/icons/icon-512.png',
+          sizes: '512x512',
+          type: 'image/png'
+        },
+        {
+          src: '/icons/icon-512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'maskable'
         }
       ],
       share_target: {
@@ -31,6 +43,9 @@ export default defineNuxtConfig({
           url: 'url'
         }
       }
+    },
+    client: {
+      installPrompt: true
     },
     workbox: {
       globPatterns: ['**/*.{js,css,html,png,svg,ico,json}']

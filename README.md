@@ -28,6 +28,12 @@ npm run build
 npm run preview
 ```
 
+## PWA 安裝注意事項
+
+- 正式環境需透過 HTTPS（Vercel 預設符合）
+- manifest 需提供至少 `192x192` 與 `512x512` 的 PNG 圖示（本專案在 `public/icons`）
+- 若更新過 service worker 或 manifest，請在瀏覽器 DevTools 清除舊快取後再重整驗證
+
 ## 樣式客製化
 
 - 主要色彩變數：`app/assets/css/main.css`
