@@ -28,6 +28,8 @@ const {
   loadLinks,
   loading,
   saving,
+  refreshingIds,
+  refreshPreview,
   addTagToForm,
   removeTagFromForm,
   saveLink,
@@ -38,10 +40,27 @@ const {
 } = useLinks()
 
 const editingId = ref('')
+const failedPreviewImages = ref<Record<string, string>>({})
+const retryPreview = async (id: string) => {
+  await refreshPreview(id)
+  delete failedPreviewImages.value[id]
+}
 const editTagInput = ref('')
 const editTags = ref<string[]>([])
 const activeTab = ref<'links' | 'map'>('links')
 const isSettingsOpen = ref(false)
+const shortcutUrlPrefix = ref('')
+const shortcutCopyMessage = ref('')
+
+const copyShortcutUrl = async () => {
+  try {
+    await navigator.clipboard.writeText(shortcutUrlPrefix.value)
+    shortcutCopyMessage.value = '已複製網址前綴，請貼到捷徑的「文字」動作。'
+  }
+  catch {
+    shortcutCopyMessage.value = '無法自動複製，請長按下方網址欄位並複製。'
+  }
+}
 const isTagModalOpen = ref(false)
 const modalTags = ref<string[]>([])
 const modalTagTitle = ref('')
@@ -256,6 +275,7 @@ watch(() => route.query, () => {
 })
 
 onMounted(async () => {
+  shortcutUrlPrefix.value = `${new URL(useRuntimeConfig().app.baseURL, window.location.origin).href}?url=`
   loadTagOrderMap()
   window.addEventListener('resize', updateTagOverflow)
   await loadLinks()
@@ -479,7 +499,7 @@ onBeforeUnmount(() => {
             <li
               v-for="item in filteredLinks"
               :key="item.id"
-              class="rounded-lg border border-slate-300 bg-surface-soft p-3"
+              class="min-w-0 rounded-lg border border-slate-300 bg-surface-soft p-3"
             >
               <div class="min-w-0 space-y-1">
                 <div class="flex items-start justify-between gap-3">
@@ -500,17 +520,26 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
                 <img
-                  v-if="item.imageUrl"
+                  v-if="item.imageUrl && failedPreviewImages[item.id] !== item.imageUrl"
                   :src="item.imageUrl"
                   alt="連結預覽圖"
                   class="mt-2 aspect-square w-full rounded-md border border-slate-200 bg-white object-contain p-1"
                   loading="lazy"
                   referrerpolicy="no-referrer"
+                  @error="failedPreviewImages[item.id] = item.imageUrl"
                 >
+                <button
+                  type="button"
+                  :disabled="refreshingIds.includes(item.id)"
+                  class="rounded-md px-2 py-1 text-sm text-primary underline underline-offset-2 disabled:opacity-50"
+                  @click="retryPreview(item.id)"
+                >
+                  {{ refreshingIds.includes(item.id) ? '更新預覽中…' : '更新預覽' }}
+                </button>
                 <p class="break-all text-xs text-muted">
                   {{ item.url }}
                 </p>
-                <p v-if="item.description" class="text-sm text-slate-700">
+                <p v-if="item.description" class="whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-slate-700">
                   {{ item.description }}
                 </p>
                 <div class="mt-2 flex items-center gap-2">
@@ -614,14 +643,14 @@ onBeforeUnmount(() => {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
       @click.self="isSettingsOpen = false"
     >
-      <div class="w-full max-w-sm rounded-xl border border-[#000000] bg-white p-4 shadow-lg">
+      <div class="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-[#000000] bg-white p-4 shadow-lg">
         <div class="mb-3 flex items-center justify-between">
-          <h2 class="text-base font-semibold text-slate-900">
+          <h2 class="text-lg font-semibold text-slate-900">
             設定
           </h2>
           <button
             type="button"
-            class="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+            class="rounded-md px-2 py-1 text-base text-slate-600 hover:bg-slate-100"
             @click="isSettingsOpen = false"
           >
             ❌
@@ -630,22 +659,50 @@ onBeforeUnmount(() => {
 
         <button
           type="button"
-          class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-left text-sm text-slate-800 transition hover:bg-slate-100"
+          class="flex w-full items-center justify-between rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-left text-base text-slate-800 transition hover:bg-slate-100"
           :disabled="isInstallingPwa || isPwaInstalled"
           @click="triggerPwaInstall"
         >
           <span>加到主畫面</span>
           <span
-            class="ml-2 text-xs"
+            class="ml-2 text-sm"
             :class="canInstallPwa ? 'text-green-700' : 'text-slate-500'"
           >
             {{ isPwaInstalled ? '已安裝' : isInstallingPwa ? '安裝中…' : canInstallPwa ? '可安裝' : '查看方式' }}
           </span>
         </button>
 
-        <p v-if="installStatusMessage" role="status" class="mt-3 text-xs text-slate-600">
+        <p v-if="installStatusMessage" role="status" class="mt-3 text-sm text-slate-600">
           {{ installStatusMessage }}
         </p>
+
+        <details class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
+          <summary class="cursor-pointer font-semibold text-slate-900">iPhone／iPad 分享捷徑教學</summary>
+          <div class="mt-3 space-y-4">
+            <p>建立一次「分享到 Froggy Link」捷徑，就能從 YouTube、Safari 等 App 的分享選單帶入連結。</p>
+            <p class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              捷徑會開啟瀏覽器網頁，不保證開啟主畫面的 PWA。兩者的收藏不會自動同步；若要存進 PWA，請複製連結後開啟 PWA 貼上新增。
+            </p>
+            <ol class="list-decimal space-y-3 pl-5">
+              <li>打開 iPhone／iPad 的「捷徑」App，按「＋」新增捷徑，命名為「分享到 Froggy Link」。</li>
+              <li>在捷徑的「詳細資訊」啟用「在分享表單中顯示」，接收類型選擇「URL」和「文字」。</li>
+              <li>加入「從輸入取得 URL」（Get URLs from Input），輸入選擇「捷徑輸入」。再加入「從列表取得項目」，選擇「第一個項目」。</li>
+              <li>加入「URL 編碼」（URL Encode），模式選「編碼」，輸入使用上一個動作的網址。</li>
+              <li>
+                加入「文字」動作，貼上下方網址前綴；在最後的「=」後插入上一個「URL 編碼」的結果變數，不要換行或加入空白。
+                <label for="shortcut-url-prefix" class="mt-2 block font-medium">此網站的網址前綴</label>
+                <input id="shortcut-url-prefix" :value="shortcutUrlPrefix" readonly class="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-base" @focus="($event.target as HTMLInputElement).select()">
+                <button type="button" class="mt-2 rounded-lg bg-primary px-3 py-2 text-base font-medium text-white hover:bg-primary-hover" @click="copyShortcutUrl">複製網址前綴</button>
+                <p v-if="shortcutCopyMessage" role="status" class="mt-2 text-base">{{ shortcutCopyMessage }}</p>
+                <p class="mt-2">組合方式：<code class="break-all">{{ shortcutUrlPrefix }}[URL 編碼的結果變數]</code>。方括號部分要插入變數，不是手動輸入這段文字。</p>
+              </li>
+              <li>最後加入「打開 URL」（Open URLs），輸入選擇剛才的「文字」，然後儲存捷徑。</li>
+              <li>到 YouTube 或 Safari 按「分享」，選擇「分享到 Froggy Link」。網頁帶入連結後，設定標籤並按「新增」。首次執行若詢問權限，依畫面提示允許。</li>
+            </ol>
+            <p>找不到捷徑時，請查看分享表單下方的動作列表，並確認已啟用「在分享表單中顯示」。各 iOS 版本的動作名稱可能略有不同。</p>
+            <a href="https://support.apple.com/zh-tw/guide/shortcuts/apd163eb9f95/ios" target="_blank" rel="noopener noreferrer" class="inline-block text-primary underline underline-offset-2">Apple 官方：從其他 App 執行捷徑</a>
+          </div>
+        </details>
       </div>
     </div>
 
@@ -656,12 +713,12 @@ onBeforeUnmount(() => {
     >
       <div class="w-full max-w-sm rounded-xl border border-[#000000] bg-white p-4 shadow-lg">
         <div class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="line-clamp-1 text-base font-semibold text-slate-900">
+          <h2 class="line-clamp-1 text-lg font-semibold text-slate-900">
             {{ modalTagTitle }}
           </h2>
           <button
             type="button"
-            class="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+            class="rounded-md px-2 py-1 text-base text-slate-600 hover:bg-slate-100"
             @click="isTagModalOpen = false"
           >
             ❌
@@ -672,7 +729,7 @@ onBeforeUnmount(() => {
           <span
             v-for="tag in modalTags"
             :key="`modal-${tag}`"
-            class="shrink-0 rounded-full border border-primary bg-primary/10 px-2 py-1 text-xs text-primary"
+            class="shrink-0 rounded-full border border-primary bg-primary/10 px-2 py-1 text-sm text-primary"
           >
             {{ tag }}
           </span>
@@ -687,12 +744,12 @@ onBeforeUnmount(() => {
     >
       <div class="w-full max-w-sm rounded-xl border border-[#000000] bg-white p-4 shadow-lg">
         <div class="mb-3 flex items-center justify-between gap-2">
-          <h2 class="line-clamp-1 text-base font-semibold text-slate-900">
+          <h2 class="line-clamp-1 text-lg font-semibold text-slate-900">
             {{ tagPickerTitle }}
           </h2>
           <button
             type="button"
-            class="rounded-md px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
+            class="rounded-md px-2 py-1 text-base text-slate-600 hover:bg-slate-100"
             @click="isTagPickerOpen = false"
           >
             ❌
@@ -700,7 +757,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="max-h-72 overflow-y-auto pr-1">
-          <p v-if="tagPickerItems.length === 0" class="text-sm text-slate-500">
+          <p v-if="tagPickerItems.length === 0" class="text-base text-slate-500">
             目前沒有標籤
           </p>
           <div v-else class="flex flex-wrap gap-2">
@@ -708,7 +765,7 @@ onBeforeUnmount(() => {
               v-for="tag in tagPickerItems"
               :key="`picker-${tag}`"
               type="button"
-              class="rounded-full border px-3 py-1 text-xs transition"
+              class="rounded-full border px-3 py-1 text-sm transition"
               :class="isTagPickerItemActive(tag)
                 ? 'border-primary bg-primary/20 text-primary'
                 : 'border-slate-300 text-slate-700 hover:border-primary'"

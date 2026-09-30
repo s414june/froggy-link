@@ -95,3 +95,36 @@ test('YouTube oEmbed failure falls back with the canonical video URL', async (t)
   assert.equal((await resolveLinkMetadata('https://www.youtube.com/shorts/dQw4w9WgXcQ')).imageUrl, 'https://media.example/thumbnail.jpg')
   assert.equal(new URL(calls[2]!).searchParams.get('url'), 'https://www.youtube.com/watch?v=dQw4w9WgXcQ')
 })
+
+test('Threads-style numeric entities decode Chinese, emoji and quoted text', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => page(
+    `<meta property="og:title" content="&#x53F0;&#x7063; Threads &#128056;">
+     <meta content="&#20013;&#25991; &quot;hello&quot; it's &amp; &nbsp;文字" property="og:description">
+     <meta property="og:image" content="https://media.example/image.jpg?a=1&amp;b=2">`
+  ))
+  assert.deepEqual(await resolveLinkMetadata('https://www.threads.net/@example/post/123'), {
+    title: '台灣 Threads 🐸',
+    description: '中文 "hello" it\'s & \u00a0文字',
+    imageUrl: 'https://media.example/image.jpg?a=1&b=2'
+  })
+})
+
+test('HTML title entities decode once while literal entity text stays literal', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => page(
+    '<title>&#x4E2D;&#x6587; &amp;#20013;</title><meta name="description" content="正常繁體中文"><meta property="og:image" content="/image.jpg">'
+  ))
+  const result = await resolveLinkMetadata('https://media.example/post')
+  assert.equal(result.title, '中文 &#20013;')
+  assert.equal(result.description, '正常繁體中文')
+})
+
+test('single-quoted metadata preserves double quotes and angle brackets', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => page(
+    `<meta content='中文 "引言" > 文字' property='og:title'>
+     <meta property='og:description' content='&#x4E2D;&#x6587;'>
+     <meta property='og:image' content='/image.jpg'>`
+  ))
+  const result = await resolveLinkMetadata('https://media.example/post')
+  assert.equal(result.title, '中文 "引言" > 文字')
+  assert.equal(result.description, '中文')
+})

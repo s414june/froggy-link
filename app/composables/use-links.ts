@@ -2,6 +2,7 @@ import type { LocationQuery } from 'vue-router'
 import type { LinkItem } from '~/types/link'
 import { fetchLinkMetadata } from '~/utils/link-metadata'
 import { readAllLinks, removeLink, upsertLink } from '~/utils/link-db'
+import { repairLegacyLink } from '~/utils/link-migration'
 
 const normalizeTag = (tag: string) => {
   return tag.trim().replace(/\s+/g, ' ')
@@ -52,7 +53,8 @@ const normalizeStoredLink = (raw: Partial<LinkItem> & Pick<LinkItem, 'id' | 'url
     description: raw.description ?? '',
     imageUrl: raw.imageUrl ?? '',
     tags: normalizeTags(raw.tags),
-    createdAt: raw.createdAt
+    createdAt: raw.createdAt,
+    metadataVersion: raw.metadataVersion
   }
 }
 
@@ -60,6 +62,7 @@ export const useLinks = () => {
   const links = ref<LinkItem[]>([])
   const loading = ref(false)
   const saving = ref(false)
+  const refreshingIds = ref<string[]>([])
   const errorMessage = ref('')
   const tagOrderMap = ref<Record<string, number>>({})
 
@@ -191,7 +194,12 @@ export const useLinks = () => {
 
     try {
       const items = await readAllLinks()
-      links.value = items.map((item) => normalizeStoredLink(item))
+      links.value = items.map((item) => repairLegacyLink(normalizeStoredLink(item)))
+      for (const item of links.value) {
+        if (items.find(raw => raw.id === item.id)?.metadataVersion !== 1) {
+          await upsertLink(item)
+        }
+      }
     }
     catch (error) {
       errorMessage.value = error instanceof Error ? error.message : '讀取資料失敗。'
@@ -251,9 +259,8 @@ export const useLinks = () => {
       if (existingItem) {
         const mergedTags = normalizeTags([...existingItem.tags, ...inputTags])
         const hasTagDiff = mergedTags.length !== normalizeTags(existingItem.tags).length
-        const metadata = !existingItem.imageUrl
-          ? await fetchLinkMetadata(normalizedUrl)
-          : null
+        // Re-adding a link also refreshes text saved by older metadata parsers.
+        const metadata = await fetchLinkMetadata(normalizedUrl)
 
         if (hasTagDiff || metadata?.title || metadata?.description || metadata?.imageUrl) {
           const updatedItem: LinkItem = {
@@ -287,7 +294,8 @@ export const useLinks = () => {
         description,
         imageUrl,
         tags: inputTags,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        metadataVersion: 1
       }
 
       await upsertLink(payload)
@@ -299,6 +307,37 @@ export const useLinks = () => {
     }
     finally {
       saving.value = false
+    }
+  }
+
+  const refreshPreview = async (id: string) => {
+    const target = links.value.find(item => item.id === id)
+    if (!target || refreshingIds.value.includes(id)) return
+    refreshingIds.value = [...refreshingIds.value, id]
+    errorMessage.value = ''
+    try {
+      const metadata = await fetchLinkMetadata(target.url)
+      if (!metadata.title && !metadata.description && !metadata.imageUrl) {
+        throw new Error('目前無法取得預覽，請稍後再試。原有收藏已保留。')
+      }
+      // Use the current record so edits/deletions during the request are respected.
+      const current = links.value.find(item => item.id === id)
+      if (!current) return
+      const updated: LinkItem = {
+        ...current,
+        title: metadata.title || current.title,
+        description: metadata.description || current.description,
+        imageUrl: metadata.imageUrl || current.imageUrl,
+        metadataVersion: 1
+      }
+      await upsertLink(updated)
+      links.value = links.value.map(item => item.id === id ? updated : item)
+    }
+    catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '更新預覽失敗。'
+    }
+    finally {
+      refreshingIds.value = refreshingIds.value.filter(item => item !== id)
     }
   }
 
@@ -367,6 +406,8 @@ export const useLinks = () => {
     loadLinks,
     loading,
     saving,
+    refreshingIds,
+    refreshPreview,
     addTagToForm,
     removeTagFromForm,
     resetForm,

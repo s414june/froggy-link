@@ -6,4 +6,5 @@ export interface LinkItem {
   imageUrl: string
   tags: string[]
   createdAt: number
+  metadataVersion?: number
 }
