@@ -46,6 +46,7 @@ const tagPickerMode = ref<'filter' | 'form-known' | 'form-selected'>('filter')
 const tagPickerItems = ref<string[]>([])
 const deferredInstallPrompt = ref<BeforeInstallPromptEvent | null>(null)
 const installStatusMessage = ref('')
+const shareHintMessage = ref('')
 const canInstallPwa = computed(() => Boolean(deferredInstallPrompt.value))
 const tagRowRefs = ref<Record<string, HTMLElement | null>>({})
 const tagOverflowById = ref<Record<string, boolean>>({})
@@ -55,6 +56,7 @@ const filterTagsRowRef = ref<HTMLElement | null>(null)
 const formKnownTagsOverflow = ref(false)
 const formSelectedTagsOverflow = ref(false)
 const filterTagsOverflow = ref(false)
+let shareHintTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const normalizeTag = (tag: string) => tag.trim().replace(/\s+/g, ' ')
 
@@ -177,6 +179,18 @@ const triggerPwaInstall = async () => {
     : '你已取消安裝。'
 }
 
+const showShareHint = (message: string) => {
+  shareHintMessage.value = message
+  if (shareHintTimer !== null) {
+    window.clearTimeout(shareHintTimer)
+  }
+
+  shareHintTimer = window.setTimeout(() => {
+    shareHintMessage.value = ''
+    shareHintTimer = null
+  }, 5000)
+}
+
 const setTagRowRef = (id: string, el: Element | null) => {
   tagRowRefs.value[id] = el instanceof HTMLElement ? el : null
 }
@@ -256,12 +270,9 @@ onMounted(async () => {
   await loadLinks()
   const shouldImportSharedLink = hydrateFromShareQuery(route.query)
   if (shouldImportSharedLink) {
-    await saveLink()
-
-    if (!errorMessage.value) {
-      await navigateTo(route.path, { replace: true })
-      installStatusMessage.value = '已從 Android 分享新增連結。'
-    }
+    await navigateTo(route.path, { replace: true })
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    showShareHint('設定標籤並按下新增！')
   }
   await nextTick()
   updateTagOverflow()
@@ -271,6 +282,9 @@ onBeforeUnmount(() => {
   window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
   window.removeEventListener('appinstalled', handleAppInstalled)
   window.removeEventListener('resize', updateTagOverflow)
+  if (shareHintTimer !== null) {
+    window.clearTimeout(shareHintTimer)
+  }
 })
 </script>
 
@@ -696,6 +710,15 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </div>
+    </div>
+
+    <div
+      v-if="shareHintMessage"
+      class="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
+    >
+      <p class="rounded-lg border border-[#000000] bg-slate-900/95 px-4 py-2 text-sm font-medium text-slate-100 shadow-lg">
+        {{ shareHintMessage }}
+      </p>
     </div>
   </main>
 </template>
