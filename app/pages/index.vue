@@ -12,6 +12,7 @@ const {
 } = useNuxtApp().$pwaInstall
 
 const route = useRoute()
+const PREVIEW_UPDATE_ENABLED_STORAGE_KEY = 'froggy-link-preview-update-enabled-v1'
 useHead({
   title: '🐸 Froggy Link'
 })
@@ -21,6 +22,7 @@ const {
   deleteLink,
   errorMessage,
   filteredLinks,
+  links,
   formTagInput,
   formTags,
   formUrl,
@@ -68,10 +70,92 @@ const pasteLink = async () => {
 }
 
 const editingId = ref('')
+const isBatchMode = ref(false)
+const selectedLinkIds = ref<string[]>([])
 const failedPreviewImages = ref<Record<string, string>>({})
 const retryPreview = async (id: string) => {
   await refreshPreview(id)
   delete failedPreviewImages.value[id]
+}
+
+const visibleLinkIds = computed(() => filteredLinks.value.map(item => item.id))
+const allVisibleSelected = computed(() => {
+  return visibleLinkIds.value.length > 0
+    && visibleLinkIds.value.every(id => selectedLinkIds.value.includes(id))
+})
+const hasSelectedLinks = computed(() => selectedLinkIds.value.length > 0)
+
+const toggleBatchMode = () => {
+  isBatchMode.value = !isBatchMode.value
+  selectedLinkIds.value = []
+  if (isBatchMode.value) {
+    cancelEdit()
+  }
+}
+
+const toggleSelectItem = (id: string) => {
+  if (!isBatchMode.value) {
+    return
+  }
+
+  if (selectedLinkIds.value.includes(id)) {
+    selectedLinkIds.value = selectedLinkIds.value.filter(item => item !== id)
+    return
+  }
+
+  selectedLinkIds.value = [...selectedLinkIds.value, id]
+}
+
+const toggleSelectAllVisible = () => {
+  if (!isBatchMode.value) {
+    return
+  }
+
+  if (allVisibleSelected.value) {
+    const visibleSet = new Set(visibleLinkIds.value)
+    selectedLinkIds.value = selectedLinkIds.value.filter(id => !visibleSet.has(id))
+    return
+  }
+
+  const nextSet = new Set(selectedLinkIds.value)
+  for (const id of visibleLinkIds.value) {
+    nextSet.add(id)
+  }
+  selectedLinkIds.value = [...nextSet]
+}
+
+const deleteSelectedLinks = async () => {
+  if (!isBatchMode.value || selectedLinkIds.value.length === 0) {
+    return
+  }
+
+  const deletingIds = [...selectedLinkIds.value]
+  for (const id of deletingIds) {
+    await deleteLink(id)
+  }
+  selectedLinkIds.value = selectedLinkIds.value.filter(id => !deletingIds.includes(id))
+}
+
+const loadPreviewUpdateSetting = () => {
+  if (!import.meta.client) {
+    return
+  }
+
+  const raw = localStorage.getItem(PREVIEW_UPDATE_ENABLED_STORAGE_KEY)
+  if (raw === null) {
+    previewUpdateEnabled.value = true
+    return
+  }
+
+  previewUpdateEnabled.value = raw !== 'false'
+}
+
+const savePreviewUpdateSetting = () => {
+  if (!import.meta.client) {
+    return
+  }
+
+  localStorage.setItem(PREVIEW_UPDATE_ENABLED_STORAGE_KEY, String(previewUpdateEnabled.value))
 }
 const editTagInput = ref('')
 const editTags = ref<string[]>([])
@@ -93,6 +177,7 @@ const filterTagsRowRef = ref<HTMLElement | null>(null)
 const formKnownTagsOverflow = ref(false)
 const formSelectedTagsOverflow = ref(false)
 const filterTagsOverflow = ref(false)
+const previewUpdateEnabled = ref(true)
 let shareHintTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const normalizeTag = (tag: string) => tag.trim().replace(/\s+/g, ' ')
@@ -116,6 +201,10 @@ const onTagInputKeydown = (event: KeyboardEvent) => {
 }
 
 const startEdit = (itemId: string, tags: string[]) => {
+  if (isBatchMode.value) {
+    return
+  }
+
   editingId.value = itemId
   editTagInput.value = ''
   editTags.value = normalizeTags(tags)
@@ -270,6 +359,11 @@ watch([filteredLinks, allTags, formTags, selectedTagFilters], async () => {
   updateTagOverflow()
 }, { deep: true })
 
+watch(links, () => {
+  const validIds = new Set(links.value.map(item => item.id))
+  selectedLinkIds.value = selectedLinkIds.value.filter(id => validIds.has(id))
+}, { deep: true })
+
 const receiveSharedLink = async () => {
   if (!hydrateFromShareQuery(route.query)) {
     return
@@ -297,6 +391,7 @@ onMounted(async () => {
   const standalone = window.matchMedia('(display-mode: standalone)').matches
     || (navigator as Navigator & { standalone?: boolean }).standalone === true
   isIosBrowser.value = ios && !standalone
+  loadPreviewUpdateSetting()
   loadTagOrderMap()
   window.addEventListener('resize', updateTagOverflow)
   await loadLinks()
@@ -421,7 +516,7 @@ onBeforeUnmount(() => {
                 <span
                   v-for="tag in formTags"
                   :key="`selected-${tag}`"
-                  class="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/20 px-2 py-1 text-xs text-primary"
+                  class="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary bg-primary/20 px-2 py-1 text-xs text-primary"
                 >
                   {{ tag }}
                   <button
@@ -489,31 +584,67 @@ onBeforeUnmount(() => {
 
         <section class="flex min-h-0 flex-1 flex-col rounded-b-xl rounded-tr-xl rounded-tl-none border border-[#000000] bg-surface p-4 shadow-sm md:p-5">
         <template v-if="activeTab === 'links'">
-          <div class="mb-4 flex items-center gap-2">
+          <div class="mb-4 space-y-2">
+            <div class="flex items-center gap-2">
+              <div
+                ref="filterTagsRowRef"
+                class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden"
+              >
+                <button
+                  v-for="tag in allTags"
+                  :key="`filter-${tag}`"
+                  class="shrink-0 rounded-full border px-3 py-1 text-xs transition"
+                  :class="selectedTagFilters.includes(tag)
+                    ? 'border-primary bg-primary/20 text-primary'
+                    : 'border-slate-300 text-slate-700 hover:border-primary'"
+                  @click="toggleTagFilter(tag)"
+                >
+                  {{ tag }}
+                </button>
+              </div>
+              <div class="flex shrink-0 items-center gap-2">
+                <button
+                  v-if="filterTagsOverflow"
+                  type="button"
+                  class="px-1 text-xs text-slate-600 hover:text-slate-900"
+                  @click="openTagPicker('filter')"
+                >
+                  ...
+                </button>
+                <button
+                  type="button"
+                  class="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 transition hover:border-primary hover:text-primary"
+                  :class="isBatchMode ? 'border-primary bg-primary/10 text-primary' : ''"
+                  @click="toggleBatchMode"
+                >
+                  {{ isBatchMode ? '完成' : '多選' }}
+                </button>
+              </div>
+            </div>
+
             <div
-              ref="filterTagsRowRef"
-              class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden"
+              v-if="isBatchMode"
+              class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
             >
               <button
-                v-for="tag in allTags"
-                :key="`filter-${tag}`"
-                class="shrink-0 rounded-full border px-3 py-1 text-xs transition"
-                :class="selectedTagFilters.includes(tag)
-                  ? 'border-primary bg-primary/20 text-primary'
-                  : 'border-slate-300 text-slate-700 hover:border-primary'"
-                @click="toggleTagFilter(tag)"
+                type="button"
+                class="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 transition hover:border-primary hover:text-primary"
+                @click="toggleSelectAllVisible"
               >
-                {{ tag }}
+                {{ allVisibleSelected ? '取消全選' : '全選' }}
               </button>
+              <button
+                type="button"
+                :disabled="!hasSelectedLinks"
+                class="rounded-md border border-red-600 bg-red-50 px-3 py-1 text-xs text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="deleteSelectedLinks"
+              >
+                刪除
+              </button>
+              <p class="text-xs text-slate-600">
+                已選 {{ selectedLinkIds.length }} 筆
+              </p>
             </div>
-            <button
-              v-if="filterTagsOverflow"
-              type="button"
-              class="shrink-0 px-1 text-xs text-slate-600 hover:text-slate-900"
-              @click="openTagPicker('filter')"
-            >
-              ...
-            </button>
           </div>
 
           <p v-if="errorMessage" class="mb-3 rounded-lg border border-red-400/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
@@ -540,7 +671,17 @@ onBeforeUnmount(() => {
                   >
                     {{ item.title }}
                   </a>
+                  <template v-if="isBatchMode">
+                    <input
+                      :id="`batch-select-${item.id}`"
+                      :checked="selectedLinkIds.includes(item.id)"
+                      type="checkbox"
+                      class="mt-1 h-4 w-4 shrink-0 accent-primary"
+                      @change="toggleSelectItem(item.id)"
+                    >
+                  </template>
                   <button
+                    v-else
                     type="button"
                     class="shrink-0 whitespace-nowrap rounded-md bg-slate-200 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-300"
                     @click="editingId === item.id ? cancelEdit() : startEdit(item.id, item.tags)"
@@ -549,7 +690,7 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
                 <img
-                  v-if="item.imageUrl && failedPreviewImages[item.id] !== item.imageUrl"
+                  v-if="previewUpdateEnabled && editingId === item.id && item.imageUrl && failedPreviewImages[item.id] !== item.imageUrl"
                   :src="item.imageUrl"
                   alt="連結預覽圖"
                   class="mt-2 aspect-square w-full rounded-md border border-slate-200 bg-white object-contain p-1"
@@ -558,6 +699,7 @@ onBeforeUnmount(() => {
                   @error="failedPreviewImages[item.id] = item.imageUrl"
                 >
                 <button
+                  v-if="previewUpdateEnabled && editingId === item.id"
                   type="button"
                   :disabled="refreshingIds.includes(item.id)"
                   class="rounded-md px-2 py-1 text-sm text-primary underline underline-offset-2 disabled:opacity-50"
@@ -599,7 +741,7 @@ onBeforeUnmount(() => {
               </div>
 
               <div
-                v-if="editingId === item.id"
+                v-if="!isBatchMode && editingId === item.id"
                 class="mt-3 space-y-3 rounded-md border border-[#000000] bg-slate-50 p-3"
               >
                 <div class="flex flex-nowrap gap-2 overflow-x-auto pb-1">
@@ -704,6 +846,19 @@ onBeforeUnmount(() => {
         <p v-if="installStatusMessage" role="status" class="mt-3 text-sm text-slate-600">
           {{ installStatusMessage }}
         </p>
+
+        <section class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
+          <h3 class="font-semibold text-slate-900">預覽設定</h3>
+          <label class="mt-2 flex cursor-pointer items-center justify-between gap-3">
+            <span>啟用「更新預覽」（僅編輯時顯示）</span>
+            <input
+              v-model="previewUpdateEnabled"
+              type="checkbox"
+              class="h-4 w-4 accent-primary"
+              @change="savePreviewUpdateSetting"
+            >
+          </label>
+        </section>
 
         <section class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
           <h3 class="font-semibold text-slate-900">iPhone／iPad 分享捷徑</h3>
