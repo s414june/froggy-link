@@ -171,6 +171,9 @@ const tagPickerItems = ref<string[]>([])
 const shareHintMessage = ref('')
 const tagRowRefs = ref<Record<string, HTMLElement | null>>({})
 const tagOverflowById = ref<Record<string, boolean>>({})
+const descriptionRefs = ref<Record<string, HTMLElement | null>>({})
+const descriptionOverflowById = ref<Record<string, boolean>>({})
+const expandedDescriptionIds = ref<string[]>([])
 const formKnownTagsRowRef = ref<HTMLElement | null>(null)
 const formSelectedTagsRowRef = ref<HTMLElement | null>(null)
 const filterTagsRowRef = ref<HTMLElement | null>(null)
@@ -179,6 +182,7 @@ const formSelectedTagsOverflow = ref(false)
 const filterTagsOverflow = ref(false)
 const previewUpdateEnabled = ref(true)
 let shareHintTimer: ReturnType<typeof window.setTimeout> | null = null
+let resizeMeasurementRafId: number | null = null
 
 const normalizeTag = (tag: string) => tag.trim().replace(/\s+/g, ' ')
 
@@ -292,6 +296,43 @@ const setTagRowRef = (id: string, el: Element | null) => {
   tagRowRefs.value[id] = el instanceof HTMLElement ? el : null
 }
 
+const setDescriptionRef = (id: string, el: Element | null) => {
+  descriptionRefs.value[id] = el instanceof HTMLElement ? el : null
+}
+
+const isDescriptionExpanded = (id: string) => {
+  return expandedDescriptionIds.value.includes(id)
+}
+
+const toggleDescription = (id: string) => {
+  if (!descriptionOverflowById.value[id]) {
+    return
+  }
+
+  if (expandedDescriptionIds.value.includes(id)) {
+    expandedDescriptionIds.value = expandedDescriptionIds.value.filter(item => item !== id)
+    return
+  }
+
+  expandedDescriptionIds.value = [...expandedDescriptionIds.value, id]
+}
+
+const updateDescriptionOverflow = () => {
+  if (!import.meta.client) {
+    return
+  }
+
+  const thresholdHeight = Math.max(Math.floor(window.innerHeight * 0.5), 160)
+  const nextMap: Record<string, boolean> = {}
+
+  for (const item of filteredLinks.value) {
+    const descriptionEl = descriptionRefs.value[item.id]
+    nextMap[item.id] = !!descriptionEl && descriptionEl.scrollHeight > thresholdHeight + 1
+  }
+
+  descriptionOverflowById.value = nextMap
+}
+
 const updateTagOverflow = () => {
   formKnownTagsOverflow.value = !!formKnownTagsRowRef.value
     && formKnownTagsRowRef.value.scrollWidth > formKnownTagsRowRef.value.clientWidth + 1
@@ -306,6 +347,26 @@ const updateTagOverflow = () => {
     nextMap[item.id] = !!row && row.scrollWidth > row.clientWidth + 1
   }
   tagOverflowById.value = nextMap
+}
+
+const runLayoutMeasurements = () => {
+  updateTagOverflow()
+  updateDescriptionOverflow()
+}
+
+const scheduleLayoutMeasurements = () => {
+  if (!import.meta.client) {
+    return
+  }
+
+  if (resizeMeasurementRafId !== null) {
+    window.cancelAnimationFrame(resizeMeasurementRafId)
+  }
+
+  resizeMeasurementRafId = window.requestAnimationFrame(() => {
+    runLayoutMeasurements()
+    resizeMeasurementRafId = null
+  })
 }
 
 const openAllTagsModal = (title: string, tags: string[]) => {
@@ -356,12 +417,13 @@ const onTagPickerItemClick = (tag: string) => {
 
 watch([filteredLinks, allTags, formTags, selectedTagFilters], async () => {
   await nextTick()
-  updateTagOverflow()
+  runLayoutMeasurements()
 }, { deep: true })
 
 watch(links, () => {
   const validIds = new Set(links.value.map(item => item.id))
   selectedLinkIds.value = selectedLinkIds.value.filter(id => validIds.has(id))
+  expandedDescriptionIds.value = expandedDescriptionIds.value.filter(id => validIds.has(id))
 }, { deep: true })
 
 const receiveSharedLink = async () => {
@@ -393,15 +455,18 @@ onMounted(async () => {
   isIosBrowser.value = ios && !standalone
   loadPreviewUpdateSetting()
   loadTagOrderMap()
-  window.addEventListener('resize', updateTagOverflow)
+  window.addEventListener('resize', scheduleLayoutMeasurements)
   await loadLinks()
   await receiveSharedLink()
   await nextTick()
-  updateTagOverflow()
+  runLayoutMeasurements()
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateTagOverflow)
+  window.removeEventListener('resize', scheduleLayoutMeasurements)
+  if (resizeMeasurementRafId !== null) {
+    window.cancelAnimationFrame(resizeMeasurementRafId)
+  }
   if (shareHintTimer !== null) {
     window.clearTimeout(shareHintTimer)
   }
@@ -710,9 +775,24 @@ onBeforeUnmount(() => {
                 <p class="break-all text-xs text-muted">
                   {{ item.url }}
                 </p>
-                <p v-if="item.description" class="whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-slate-700">
-                  {{ item.description }}
-                </p>
+                <div v-if="item.description" class="mt-1 space-y-1">
+                  <p
+                    :ref="(el) => setDescriptionRef(item.id, el)"
+                    class="whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-slate-700 transition-[max-height] duration-200"
+                    :class="isDescriptionExpanded(item.id) ? 'max-h-none' : 'max-h-[50dvh] overflow-hidden'"
+                  >
+                    {{ item.description }}
+                  </p>
+                  <button
+                    v-if="descriptionOverflowById[item.id]"
+                    type="button"
+                    class="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs text-primary hover:bg-primary/10"
+                    @click="toggleDescription(item.id)"
+                  >
+                    <span>{{ isDescriptionExpanded(item.id) ? '收回' : '展開' }}</span>
+                    <span aria-hidden="true">{{ isDescriptionExpanded(item.id) ? '▴' : '▾' }}</span>
+                  </button>
+                </div>
                 <div class="mt-2 flex items-center gap-2">
                   <div
                     :ref="(el) => setTagRowRef(item.id, el)"

@@ -50,6 +50,7 @@ npm run preview
 - 由 Nuxt 內建 API (`/api/metadata`) 代抓目標頁面 meta（`og:*` / `twitter:*` / `description`）
 - YouTube 影片（包含 Android App 分享的 `youtu.be`、Shorts 與直播連結）優先透過 YouTube oEmbed 取得標題與縮圖
 - 若目標網站 meta 不完整，會透過 `noembed` 補齊缺少的欄位；只有標題時也會繼續嘗試取得縮圖
+- 蝦皮商品連結若受到反爬限制導致無法直接取得主圖，會改用商品頁截圖作為預覽圖 fallback
 - 短網址重新導向後，以最終頁面網址解析相對圖片路徑
 - 已儲存的連結再次新增時會更新預覽文字與縮圖，並保留原有標籤；可用於修復舊版本儲存的 HTML 字元編碼文字
 - 舊收藏中殘留的數字 HTML 字元編碼會在載入時自動修復一次，保留網址、標籤與建立時間
