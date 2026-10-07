@@ -1,4 +1,5 @@
-import { instagramPostUrl, instagramDisplayText } from '../../app/utils/instagram.ts'
+import { linkDisplayText } from '../../app/utils/link-display.ts'
+import { instagramPostUrl } from '../../app/utils/instagram.ts'
 import { decodeHTML, decodeHTMLAttribute } from 'entities'
 
 interface LinkMetadata {
@@ -70,7 +71,7 @@ const parseFromHtml = (html: string, targetUrl: string): LinkMetadata => {
   if (instagramPostUrl(targetUrl)) {
     title = extractMetaValue(html, 'twitter:title', 'name') || title
   }
-  return { ...instagramDisplayText(targetUrl, title, description), imageUrl }
+  return { ...linkDisplayText(targetUrl, title, description), imageUrl }
 }
 
 const youtubeVideoUrl = (url: string) => {

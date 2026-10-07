@@ -137,7 +137,7 @@ test('Instagram uses clean post URL and author title while preserving caption an
   })
   const result = await resolveLinkMetadata('https://www.instagram.com/p/ABC/?stkn=tracking')
   assert.equal(calls[0], 'https://www.instagram.com/p/ABC/')
-  assert.equal(result.title, 'Author (@author) • Instagram photos and videos')
+  assert.equal(result.title, 'Author (@author) · Instagram')
   assert.equal(result.description, 'caption')
   assert.equal(result.imageUrl, 'https://scontent.cdninstagram.com/photo.jpg?a=1&b=2')
 })

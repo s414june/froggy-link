@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { instagramDisplayText } from '~/utils/instagram'
+import { linkDisplayText } from '~/utils/link-display'
 
 const props = defineProps<{ url: string, title: string, description: string }>()
-const text = computed(() => instagramDisplayText(props.url, props.title, props.description))
+const text = computed(() => linkDisplayText(props.url, props.title, props.description))
 const expanded = ref(false)
 const titleBox = ref<HTMLElement>()
 const descriptionBox = ref<HTMLElement>()
@@ -42,7 +42,7 @@ onBeforeUnmount(() => {
 <template>
   <div :id="contentId" class="min-w-0 space-y-1">
     <div class="flex items-start justify-between gap-3">
-      <div ref="titleBox" class="min-w-0 break-words [overflow-wrap:anywhere]" :class="{ 'collapsed-text': !expanded, 'faded-text': !expanded && titleOverflow }">
+      <div ref="titleBox" class="min-w-0 break-words [overflow-wrap:anywhere]" :class="{ 'collapsed-title': !expanded, 'faded-text': !expanded && titleOverflow }">
         <a :href="url" target="_blank" rel="noopener noreferrer" class="text-base font-semibold text-primary underline-offset-2 hover:underline">{{ text.title }}</a>
       </div>
       <slot name="edit" />
@@ -56,6 +56,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.collapsed-title { max-height: 20dvh; overflow: hidden; }
 .collapsed-text { max-height: 30dvh; overflow: hidden; }
 .faded-text { mask-image: linear-gradient(to bottom, #000 calc(100% - 2rem), transparent); }
 </style>

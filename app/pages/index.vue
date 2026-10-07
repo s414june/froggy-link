@@ -711,7 +711,7 @@ onBeforeUnmount(() => {
                   </button>
                   </template>
                 <img
-                  v-if="previewUpdateEnabled && editingId === item.id && previewSource(item) && failedPreviewImages[item.id] !== previewSource(item)"
+                  v-if="previewSource(item) && failedPreviewImages[item.id] !== previewSource(item)"
                   :src="previewSource(item)"
                   alt="連結預覽圖"
                   class="mt-2 aspect-square w-full rounded-md border border-slate-200 bg-white object-contain p-1"
