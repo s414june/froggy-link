@@ -873,9 +873,8 @@ onBeforeUnmount(() => {
         </p>
 
         <section class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
-          <h3 class="font-semibold text-slate-900">預覽設定</h3>
-          <label class="mt-2 flex cursor-pointer items-center justify-between gap-3">
-            <span>啟用「更新預覽」（僅編輯時顯示）</span>
+          <label class="flex cursor-pointer items-center justify-between gap-3">
+            <span>啟用「更新預覽」（僅更新時顯示）</span>
             <input
               v-model="previewUpdateEnabled"
               type="checkbox"
