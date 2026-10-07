@@ -89,6 +89,101 @@ const youtubeVideoUrl = (url: string) => {
   return /^[\w-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : ''
 }
 
+interface ShopeeLinkInfo {
+  domain: string
+  shopId: string
+  itemId: string
+  slug: string
+}
+
+const isShopeeDomain = (hostname: string) => {
+  return /(^|\.)shopee\.[a-z.]+$/i.test(hostname)
+}
+
+const parseShopeeLinkInfo = (targetUrl: string): ShopeeLinkInfo | null => {
+  let parsed: URL
+  try {
+    parsed = new URL(targetUrl)
+  }
+  catch {
+    return null
+  }
+
+  if (!isShopeeDomain(parsed.hostname)) {
+    return null
+  }
+
+  const dashPattern = /-i\.(\d+)\.(\d+)(?:$|[/?#])/i.exec(parsed.pathname)
+  if (dashPattern) {
+    const slugSegment = parsed.pathname.split('/').filter(Boolean).pop() || ''
+    const slug = slugSegment.replace(/-i\.\d+\.\d+.*$/i, '')
+    return {
+      domain: parsed.origin,
+      shopId: dashPattern[1] || '',
+      itemId: dashPattern[2] || '',
+      slug
+    }
+  }
+
+  const productPattern = /^\/product\/(\d+)\/(\d+)(?:\/|$)/i.exec(parsed.pathname)
+  if (productPattern) {
+    return {
+      domain: parsed.origin,
+      shopId: productPattern[1] || '',
+      itemId: productPattern[2] || '',
+      slug: ''
+    }
+  }
+
+  return null
+}
+
+const decodeShopeeSlug = (slug: string) => {
+  if (!slug) {
+    return ''
+  }
+
+  let decoded = slug
+  try {
+    decoded = decodeURIComponent(slug)
+  }
+  catch {
+    decoded = slug
+  }
+
+  return decoded
+    .replace(/[+\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const buildScreenshotFallbackUrl = (targetUrl: string) => {
+  if (!targetUrl) {
+    return ''
+  }
+
+  // Some commerce pages block direct metadata APIs for anonymous requests.
+  // Use a rendered screenshot as a stable preview fallback.
+  return `https://image.thum.io/get/width/1200/noanimate/${targetUrl}`
+}
+
+const buildShopeeMetadataFallback = (targetUrl: string): LinkMetadata => {
+  const info = parseShopeeLinkInfo(targetUrl)
+  if (!info) {
+    return emptyMetadata()
+  }
+
+  const readableTitle = decodeShopeeSlug(info.slug)
+  const title = readableTitle || `蝦皮商品 ${info.shopId}/${info.itemId}`
+  const canonicalUrl = `${info.domain}/product/${info.shopId}/${info.itemId}`
+
+  return {
+    title,
+    description: `蝦皮購物商品 · 商店 ${info.shopId} · 商品 ${info.itemId}`,
+    imageUrl: buildScreenshotFallbackUrl(canonicalUrl)
+  }
+}
+
 const fetchEmbedMetadata = async (endpoint: string) => {
   const response = await fetch(endpoint, {
     headers: { Accept: 'application/json' },
@@ -166,13 +261,24 @@ export const resolveLinkMetadata = async (targetUrl: string): Promise<LinkMetada
   try {
     const embedUrl = youtubeUrl || youtubeVideoUrl(resolvedUrl) || resolvedUrl
     const fallback = await fetchEmbedMetadata(`https://noembed.com/embed?url=${encodeURIComponent(embedUrl)}`)
-    return {
+    metadata = {
       title: metadata.title || fallback.title,
       description: metadata.description || fallback.description,
       imageUrl: metadata.imageUrl || toAbsoluteUrl(resolvedUrl, fallback.imageUrl)
     }
   }
   catch {
-    return metadata
+    // Keep existing metadata and continue to domain-specific fallbacks.
   }
+
+  if (!metadata.title || !metadata.description || !metadata.imageUrl) {
+    const shopeeMetadata = buildShopeeMetadataFallback(resolvedUrl || targetUrl)
+    metadata = {
+      title: metadata.title || shopeeMetadata.title,
+      description: metadata.description || shopeeMetadata.description,
+      imageUrl: metadata.imageUrl || shopeeMetadata.imageUrl
+    }
+  }
+
+  return metadata
 }
