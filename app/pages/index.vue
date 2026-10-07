@@ -728,9 +728,6 @@ onBeforeUnmount(() => {
                 >
                   {{ refreshingIds.includes(item.id) ? '更新預覽中…' : '更新預覽' }}
                 </button>
-                <p class="break-all text-xs text-muted">
-                  {{ item.url }}
-                </p>
                 </LinkCardText>
                 <div class="mt-2 flex items-center gap-2">
                   <div

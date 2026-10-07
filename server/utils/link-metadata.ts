@@ -158,16 +158,6 @@ const decodeShopeeSlug = (slug: string) => {
     .trim()
 }
 
-const buildScreenshotFallbackUrl = (targetUrl: string) => {
-  if (!targetUrl) {
-    return ''
-  }
-
-  // Some commerce pages block direct metadata APIs for anonymous requests.
-  // Use a rendered screenshot as a stable preview fallback.
-  return `https://image.thum.io/get/width/1200/noanimate/${targetUrl}`
-}
-
 const buildShopeeMetadataFallback = (targetUrl: string): LinkMetadata => {
   const info = parseShopeeLinkInfo(targetUrl)
   if (!info) {
@@ -176,12 +166,11 @@ const buildShopeeMetadataFallback = (targetUrl: string): LinkMetadata => {
 
   const readableTitle = decodeShopeeSlug(info.slug)
   const title = readableTitle || `蝦皮商品 ${info.shopId}/${info.itemId}`
-  const canonicalUrl = `${info.domain}/product/${info.shopId}/${info.itemId}`
 
   return {
     title,
     description: `蝦皮購物商品 · 商店 ${info.shopId} · 商品 ${info.itemId}`,
-    imageUrl: buildScreenshotFallbackUrl(canonicalUrl)
+    imageUrl: ''
   }
 }
 

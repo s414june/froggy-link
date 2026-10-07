@@ -1,7 +1,30 @@
 import { instagramDisplayText } from './instagram.ts'
 
 export const linkDisplayText = (url: string, title: string, description: string) => {
-  const text = instagramDisplayText(url, title, description)
+  let text = instagramDisplayText(url, title, description)
+  try {
+    const host = new URL(url).hostname
+    if (host === 'facebook.com' || host.endsWith('.facebook.com') || host === 'fb.watch') {
+      // Facebook reel metadata: engagement counts | full caption | author.
+      // The description is often only a truncated caption, so exact matching
+      // alone cannot remove the duplicate from the title.
+      const parts = title.split(/\s+[|｜]\s+/)
+      const hasCounts = /\d/.test(parts[0] || '') && /reactions?|likes?|views?|shares?|心情|分享|觀看|讚/i.test(parts[0] || '')
+      if (hasCounts && parts.length >= 2) {
+        const author = parts.length >= 3 ? parts.pop()!.trim() : ''
+        const caption = parts.slice(1).join(' | ').trim()
+        const prefix = description.replace(/(?:\.\.\.|…)\s*$/, '').trim()
+        text = {
+          title: author && author.length <= 160 ? `${author} · Facebook` : 'Facebook 貼文',
+          description: !description || (prefix && caption.startsWith(prefix)) ? caption : description
+        }
+      }
+      else if (title.length > 160 || /[\r\n]/.test(title)) {
+        text = { title: 'Facebook 貼文', description: description || title }
+      }
+    }
+  }
+  catch { /* Non-URL legacy records retain their text. */ }
   const normalize = (value: string) => value.replace(/\s+/g, ' ').trim()
   const heading = normalize(text.title)
   const body = normalize(text.description)

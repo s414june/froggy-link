@@ -141,3 +141,10 @@ test('Instagram uses clean post URL and author title while preserving caption an
   assert.equal(result.description, 'caption')
   assert.equal(result.imageUrl, 'https://scontent.cdninstagram.com/photo.jpg?a=1&b=2')
 })
+
+test('Shopee fallback never generates a screenshot when metadata is unavailable', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('Unavailable') })
+  const result = await resolveLinkMetadata('https://shopee.tw/product/123/456')
+  assert.equal(result.imageUrl, '')
+  assert.match(result.title, /蝦皮/)
+})

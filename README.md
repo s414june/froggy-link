@@ -50,7 +50,7 @@ npm run preview
 - 由 Nuxt 內建 API (`/api/metadata`) 代抓目標頁面 meta（`og:*` / `twitter:*` / `description`）
 - YouTube 影片（包含 Android App 分享的 `youtu.be`、Shorts 與直播連結）優先透過 YouTube oEmbed 取得標題與縮圖
 - 若目標網站 meta 不完整，會透過 `noembed` 補齊缺少的欄位；只有標題時也會繼續嘗試取得縮圖
-- 蝦皮商品連結若受到反爬限制導致無法直接取得主圖，會改用商品頁截圖作為預覽圖 fallback
+- 蝦皮商品無法取得主圖時不產生截圖；舊收藏截圖維持顯示，使用者更新預覽後才依新結果替換。
 - 短網址重新導向後，以最終頁面網址解析相對圖片路徑
 - 已儲存的連結再次新增時會更新預覽文字與縮圖，並保留原有標籤；可用於修復舊版本儲存的 HTML 字元編碼文字
 - 舊收藏中殘留的數字 HTML 字元編碼會在載入時自動修復一次，保留網址、標籤與建立時間
@@ -84,7 +84,7 @@ shortcuts sign --mode anyone --input shortcuts/share-to-froggy-link.unsigned.sho
 
 ## 卡片文字與 Instagram 預覽
 
-- 標題收合時最多 `20dvh`、敘述最多 `30dvh`；只有溢出的文字套用淡出遮罩，共用的展開／收合按鈕固定在敘述下方。
+- 標題收合時最多 `20dvh`、網址最多 `10dvh`、敘述最多 `30dvh`；只有溢出的文字套用淡出遮罩，共用的展開／收合按鈕固定在敘述下方。
 - Instagram 優先取作者的 `twitter:title`；舊收藏的 `作者 on Instagram: 內文` 只在顯示時拆分，無資料庫遷移或清除。
 - IG 縮圖走 `/api/instagram-image?url=貼文網址`，從公開貼文即時取得 CDN 圖片；只允許 Instagram 貼文和指定圖片 CDN，限制格式、大小與逾時。私人、刪除或限制存取的貼文仍可能無圖，失敗時隱藏圖片區域。
 - 既有 IG 收藏即使沒有儲存縮圖，也會嘗試此 API；無需刪除後重建收藏。正式部署端仍需能連線到 Instagram。
