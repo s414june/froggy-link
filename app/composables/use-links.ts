@@ -1,3 +1,4 @@
+import { applyPreviewRefresh } from '~/utils/preview-refresh'
 import type { LocationQuery } from 'vue-router'
 import type { LinkItem } from '~/types/link'
 import { fetchLinkMetadata } from '~/utils/link-metadata'
@@ -267,7 +268,7 @@ export const useLinks = () => {
             ...existingItem,
             title: metadata?.title || existingItem.title,
             description: metadata?.description || existingItem.description,
-            imageUrl: metadata?.imageUrl || existingItem.imageUrl,
+            imageUrl: metadata.succeeded ? metadata.imageUrl : existingItem.imageUrl,
             tags: mergedTags
           }
 
@@ -317,19 +318,10 @@ export const useLinks = () => {
     errorMessage.value = ''
     try {
       const metadata = await fetchLinkMetadata(target.url)
-      if (!metadata.title && !metadata.description && !metadata.imageUrl) {
-        throw new Error('目前無法取得預覽，請稍後再試。原有收藏已保留。')
-      }
       // Use the current record so edits/deletions during the request are respected.
       const current = links.value.find(item => item.id === id)
       if (!current) return
-      const updated: LinkItem = {
-        ...current,
-        title: metadata.title || current.title,
-        description: metadata.description || current.description,
-        imageUrl: metadata.imageUrl || current.imageUrl,
-        metadataVersion: 1
-      }
+      const updated = applyPreviewRefresh(current, metadata)
       await upsertLink(updated)
       links.value = links.value.map(item => item.id === id ? updated : item)
     }

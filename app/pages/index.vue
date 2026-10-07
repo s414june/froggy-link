@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { instagramPostUrl } from '~/utils/instagram'
+import { selectedTagsFirst } from '~/utils/tag-order'
 import { useLinks } from '~/composables/use-links'
 
 const {
@@ -74,6 +75,9 @@ const previewSource = (item: { url: string, imageUrl?: string }) => {
   const post = instagramPostUrl(item.url)
   return post ? `/api/instagram-image?url=${encodeURIComponent(post)}` : item.imageUrl || ''
 }
+const formKnownTags = computed(() => selectedTagsFirst(allTags.value, formTags.value))
+const filterTags = computed(() => selectedTagsFirst(allTags.value, selectedTagFilters.value))
+const orderedPickerTags = computed(() => selectedTagsFirst(tagPickerItems.value, tagPickerMode.value === 'filter' ? selectedTagFilters.value : formTags.value))
 const editingId = ref('')
 const isBatchMode = ref(false)
 const selectedLinkIds = ref<string[]>([])
@@ -438,7 +442,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="min-h-screen bg-bg text-text">
-    <div class="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-6">
+    <div class="app-shell mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 md:px-6">
       <header class="flex items-center justify-between gap-3">
         <h1 class="flex items-center gap-2 text-2xl font-bold md:text-3xl">
           <img src="/icons/icon-192.png" alt="" width="40" height="40" class="h-10 w-10 shrink-0">
@@ -500,10 +504,10 @@ onBeforeUnmount(() => {
             <div class="flex items-center gap-2">
               <div
                 ref="formKnownTagsRowRef"
-                class="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-hidden"
+                class="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden"
               >
                 <button
-                  v-for="tag in allTags"
+                  v-for="tag in formKnownTags"
                   :key="`known-${tag}`"
                   type="button"
                   class="shrink-0 rounded-full border px-2 py-1 text-xs transition"
@@ -539,7 +543,7 @@ onBeforeUnmount(() => {
             <div class="flex items-center gap-2">
               <div
                 ref="formSelectedTagsRowRef"
-                class="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-hidden"
+                class="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden"
               >
                 <span
                   v-for="tag in formTags"
@@ -578,8 +582,8 @@ onBeforeUnmount(() => {
         </form>
       </section>
 
-      <div class="flex h-[calc(100dvh-3rem)] min-h-[420px] flex-col space-y-0">
-        <div class="-mb-px flex items-end gap-2">
+      <div class="tab-workspace flex h-[calc(100dvh-3rem)] min-h-[420px] flex-col space-y-0">
+        <div class="desktop-tabs -mb-px flex items-end gap-2">
           <button
             type="button"
             class="relative shrink-0 whitespace-nowrap rounded-t-lg border border-[#000000] border-b-0 px-3 py-2 text-sm transition"
@@ -610,16 +614,16 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <section class="flex min-h-0 flex-1 flex-col rounded-b-xl rounded-tr-xl rounded-tl-none border border-[#000000] bg-surface p-4 shadow-sm md:p-5">
+        <section class="tab-panel flex min-h-0 flex-1 flex-col rounded-b-xl rounded-tr-xl rounded-tl-none border border-[#000000] bg-surface p-4 shadow-sm md:p-5">
         <template v-if="activeTab === 'links'">
           <div class="mb-4 space-y-2">
             <div class="flex items-center gap-2">
               <div
                 ref="filterTagsRowRef"
-                class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-hidden"
+                class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden"
               >
                 <button
-                  v-for="tag in allTags"
+                  v-for="tag in filterTags"
                   :key="`filter-${tag}`"
                   class="shrink-0 rounded-full border px-3 py-1 text-xs transition"
                   :class="selectedTagFilters.includes(tag)
@@ -683,7 +687,7 @@ onBeforeUnmount(() => {
             載入中...
           </p>
 
-          <ul v-else-if="filteredLinks.length > 0" class="grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start items-start gap-3 overflow-y-auto pr-1 min-[480px]:grid-cols-2">
+          <ul v-else-if="filteredLinks.length > 0" class="link-list grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start items-start gap-3 overflow-y-auto pr-1 min-[480px]:grid-cols-2">
             <li
               v-for="item in filteredLinks"
               :key="item.id"
@@ -732,7 +736,7 @@ onBeforeUnmount(() => {
                 <div class="mt-2 flex items-center gap-2">
                   <div
                     :ref="(el) => setTagRowRef(item.id, el)"
-                    class="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-hidden"
+                    class="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden"
                   >
                     <span
                       v-for="tag in item.tags"
@@ -812,7 +816,7 @@ onBeforeUnmount(() => {
 
         <div
           v-else
-          class="h-full overflow-y-auto rounded-lg border border-dashed border-[#000000] bg-surface p-4"
+          class="map-panel h-full overflow-y-auto rounded-lg border border-dashed border-[#000000] bg-surface p-4"
         >
           <h2 class="text-base font-semibold">
             地圖點位（預留）
@@ -824,6 +828,11 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </div>
+
+    <nav class="mobile-tabs" aria-label="主要頁籤">
+      <button type="button" :aria-current="activeTab === 'links' ? 'page' : undefined" :class="{ 'text-primary bg-primary/10': activeTab === 'links' }" @click="activeTab = 'links'">連結清單</button>
+      <button type="button" :aria-current="activeTab === 'map' ? 'page' : undefined" :class="{ 'text-primary bg-primary/10': activeTab === 'map' }" @click="activeTab = 'map'">地圖點位</button>
+    </nav>
 
     <div
       v-if="isSettingsOpen"
@@ -940,7 +949,7 @@ onBeforeUnmount(() => {
           </p>
           <div v-else class="flex flex-wrap gap-2">
             <button
-              v-for="tag in tagPickerItems"
+              v-for="tag in orderedPickerTags"
               :key="`picker-${tag}`"
               type="button"
               class="rounded-full border px-3 py-1 text-sm transition"
@@ -966,3 +975,30 @@ onBeforeUnmount(() => {
     </div>
   </main>
 </template>
+
+<style scoped>
+.mobile-tabs { display: none; }
+@media (max-width: 639px) {
+  .app-shell {
+    gap: 1rem;
+    padding: max(1rem, env(safe-area-inset-top)) 0 calc(5rem + env(safe-area-inset-bottom));
+    min-height: 100dvh;
+  }
+  .app-shell > header, .app-shell > section, .app-shell > p { margin-inline: 1rem; }
+  .app-shell > header h1 { font-size: 1.25rem; }
+  .tab-workspace { height: auto; min-height: 0; flex: 1; }
+  .desktop-tabs { display: none; }
+  .tab-panel { border-radius: 0; border-inline: 0; padding: 1rem; box-shadow: none; }
+  /* One document scroll: the add form leaves first, then the list follows.
+     No inner vertical scroll or JS scroll handoff on mobile. */
+  .link-list { flex: none; overflow-y: visible; min-height: auto; padding-right: 0; grid-template-columns: minmax(0, 1fr); }
+  .map-panel { height: auto; overflow-y: visible; min-height: 50dvh; }
+  .mobile-tabs {
+    display: grid; grid-template-columns: 1fr 1fr;
+    position: fixed; inset: auto 0 0; z-index: 40;
+    padding: .5rem 1rem calc(.5rem + env(safe-area-inset-bottom));
+    background: white; border-top: 1px solid #cbd5e1;
+  }
+  .mobile-tabs button { min-height: 3rem; border-radius: .75rem; font-size: .875rem; font-weight: 600; }
+}
+</style>

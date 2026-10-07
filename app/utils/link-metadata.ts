@@ -11,6 +11,7 @@ export const fetchLinkMetadata = async (url: string) => {
     })
 
     return {
+      succeeded: true,
       title: response.title || '',
       description: response.description || '',
       imageUrl: response.imageUrl || ''
@@ -18,6 +19,7 @@ export const fetchLinkMetadata = async (url: string) => {
   }
   catch {
     return {
+      succeeded: false,
       title: '',
       description: '',
       imageUrl: ''
