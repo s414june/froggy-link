@@ -1,3 +1,4 @@
+import { instagramPostUrl, instagramDisplayText } from '../../app/utils/instagram.ts'
 import { decodeHTML, decodeHTMLAttribute } from 'entities'
 
 interface LinkMetadata {
@@ -52,7 +53,7 @@ const toAbsoluteUrl = (targetUrl: string, value: string) => {
 }
 
 const parseFromHtml = (html: string, targetUrl: string): LinkMetadata => {
-  const title = extractMetaValue(html, 'og:title', 'property')
+  let title = extractMetaValue(html, 'og:title', 'property')
     || extractMetaValue(html, 'twitter:title', 'name')
     || extractTitle(html)
 
@@ -66,11 +67,10 @@ const parseFromHtml = (html: string, targetUrl: string): LinkMetadata => {
       || extractMetaValue(html, 'twitter:image', 'name')
   )
 
-  return {
-    title,
-    description,
-    imageUrl
+  if (instagramPostUrl(targetUrl)) {
+    title = extractMetaValue(html, 'twitter:title', 'name') || title
   }
+  return { ...instagramDisplayText(targetUrl, title, description), imageUrl }
 }
 
 const youtubeVideoUrl = (url: string) => {
@@ -138,7 +138,7 @@ export const resolveLinkMetadata = async (targetUrl: string): Promise<LinkMetada
   }
 
   try {
-    const response = await fetch(targetUrl, {
+    const response = await fetch(instagramPostUrl(targetUrl) || targetUrl, {
       headers: {
         'User-Agent': 'froggy-link-metadata-fetcher/1.0',
         Accept: 'text/html,application/xhtml+xml'

@@ -128,3 +128,16 @@ test('single-quoted metadata preserves double quotes and angle brackets', async 
   assert.equal(result.title, '中文 "引言" > 文字')
   assert.equal(result.description, '中文')
 })
+
+test('Instagram uses clean post URL and author title while preserving caption and thumbnail', async (t) => {
+  const calls: string[] = []
+  t.mock.method(globalThis, 'fetch', async (url: string) => {
+    calls.push(url)
+    return page('<meta property="og:title" content="Author on Instagram: &quot;caption&quot;"><meta name="twitter:title" content="Author (@author) • Instagram photos and videos"><meta property="og:description" content="caption"><meta property="og:image" content="https://scontent.cdninstagram.com/photo.jpg?a=1&amp;b=2">', 'https://www.instagram.com/p/ABC/')
+  })
+  const result = await resolveLinkMetadata('https://www.instagram.com/p/ABC/?stkn=tracking')
+  assert.equal(calls[0], 'https://www.instagram.com/p/ABC/')
+  assert.equal(result.title, 'Author (@author) • Instagram photos and videos')
+  assert.equal(result.description, 'caption')
+  assert.equal(result.imageUrl, 'https://scontent.cdninstagram.com/photo.jpg?a=1&b=2')
+})

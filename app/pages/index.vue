@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { instagramPostUrl } from '~/utils/instagram'
 import { useLinks } from '~/composables/use-links'
 
 const {
@@ -67,6 +68,10 @@ const pasteLink = async () => {
   }
 }
 
+const previewSource = (item: { url: string, imageUrl?: string }) => {
+  const post = instagramPostUrl(item.url)
+  return post ? `/api/instagram-image?url=${encodeURIComponent(post)}` : item.imageUrl || ''
+}
 const editingId = ref('')
 const failedPreviewImages = ref<Record<string, string>>({})
 const retryPreview = async (id: string) => {
@@ -531,15 +536,8 @@ onBeforeUnmount(() => {
               class="min-w-0 rounded-lg border border-slate-300 bg-surface-soft p-3"
             >
               <div class="min-w-0 space-y-1">
-                <div class="flex items-start justify-between gap-3">
-                  <a
-                    :href="item.url"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="break-all text-base font-semibold text-primary underline-offset-2 hover:underline"
-                  >
-                    {{ item.title }}
-                  </a>
+                <LinkCardText :url="item.url" :title="item.title" :description="item.description">
+                  <template #edit>
                   <button
                     type="button"
                     class="shrink-0 whitespace-nowrap rounded-md bg-slate-200 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-300"
@@ -547,15 +545,15 @@ onBeforeUnmount(() => {
                   >
                     {{ editingId === item.id ? '取消' : '編輯' }}
                   </button>
-                </div>
+                  </template>
                 <img
-                  v-if="item.imageUrl && failedPreviewImages[item.id] !== item.imageUrl"
-                  :src="item.imageUrl"
+                  v-if="previewSource(item) && failedPreviewImages[item.id] !== previewSource(item)"
+                  :src="previewSource(item)"
                   alt="連結預覽圖"
                   class="mt-2 aspect-square w-full rounded-md border border-slate-200 bg-white object-contain p-1"
                   loading="lazy"
                   referrerpolicy="no-referrer"
-                  @error="failedPreviewImages[item.id] = item.imageUrl"
+                  @error="failedPreviewImages[item.id] = previewSource(item)"
                 >
                 <button
                   type="button"
@@ -568,9 +566,7 @@ onBeforeUnmount(() => {
                 <p class="break-all text-xs text-muted">
                   {{ item.url }}
                 </p>
-                <p v-if="item.description" class="whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-slate-700">
-                  {{ item.description }}
-                </p>
+                </LinkCardText>
                 <div class="mt-2 flex items-center gap-2">
                   <div
                     :ref="(el) => setTagRowRef(item.id, el)"

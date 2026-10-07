@@ -80,3 +80,10 @@ shortcuts sign --mode anyone --input shortcuts/share-to-froggy-link.unsigned.sho
 ```
 
 `shortcuts/share-to-froggy-link.plist` 是可閱讀的動作定義。修改後請重新簽署、匯入「捷徑」App、命名為「分享到 Froggy Link」，測試後使用分享選單的「拷貝 iCloud 連結」建立新版本，再更新 `app/pages/ios-shortcut.vue` 的 `installUrl` 與本文件。既有 iCloud 分享連結不會跟著原始碼更新。
+
+## 卡片文字與 Instagram 預覽
+
+- 標題和敘述收合時各自最多 `30dvh`；只有溢出的文字套用淡出遮罩，共用的展開／收合按鈕固定在敘述下方。
+- Instagram 優先取作者的 `twitter:title`；舊收藏的 `作者 on Instagram: 內文` 只在顯示時拆分，無資料庫遷移或清除。
+- IG 縮圖走 `/api/instagram-image?url=貼文網址`，從公開貼文即時取得 CDN 圖片；只允許 Instagram 貼文和指定圖片 CDN，限制格式、大小與逾時。私人、刪除或限制存取的貼文仍可能無圖，失敗時隱藏圖片區域。
+- 既有 IG 收藏即使沒有儲存縮圖，也會嘗試此 API；無需刪除後重建收藏。正式部署端仍需能連線到 Instagram。
