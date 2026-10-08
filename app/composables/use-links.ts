@@ -1,3 +1,4 @@
+import { linkIdentity } from '~/utils/link-identity'
 import { applyPreviewRefresh, applyRepeatedLinkPreview } from '~/utils/preview-refresh'
 import type { LocationQuery } from 'vue-router'
 import type { LinkItem } from '~/types/link'
@@ -253,7 +254,8 @@ export const useLinks = () => {
       ...(pendingInputTag ? [pendingInputTag] : [])
     ])
     registerNewTags(inputTags)
-    const existingItem = links.value.find((item) => item.url === normalizedUrl)
+    const identity = linkIdentity(normalizedUrl)
+    const existingItem = links.value.find((item) => linkIdentity(item.url) === identity)
 
     saving.value = true
     try {
@@ -269,7 +271,7 @@ export const useLinks = () => {
           .sort((a, b) => b.createdAt - a.createdAt)
 
         resetForm()
-        return
+        return 'duplicate' as const
       }
 
       const metadata = await fetchLinkMetadata(normalizedUrl)

@@ -304,6 +304,10 @@ const showShareHint = (message: string) => {
   }, 5000)
 }
 
+const submitLink = async () => {
+  if (await saveLink() === 'duplicate') showShareHint('這個連結已經建立過囉！')
+}
+
 const setTagRowRef = (id: string, el: Element | null) => {
   tagRowRefs.value[id] = el instanceof HTMLElement ? el : null
 }
@@ -487,7 +491,7 @@ onBeforeUnmount(() => {
       </p>
 
       <section class="rounded-xl border border-[#000000] bg-surface p-4 shadow-sm md:p-5">
-        <form class="space-y-4" @submit.prevent="saveLink">
+        <form class="space-y-4" @submit.prevent="submitLink">
           <div v-if="isIosBrowser && receivedSharedLink" class="rounded-lg border border-primary/30 bg-primary/5 p-3 text-base leading-relaxed">
             <p class="font-semibold">目前開啟的是瀏覽器版</p>
             <p class="mt-1">若要存進已安裝的 Froggy Link App，請複製網址，再從主畫面開啟 App 貼上新增。這裡的收藏不會自動同步到 App。</p>
@@ -991,6 +995,7 @@ onBeforeUnmount(() => {
 
     <div
       v-if="shareHintMessage"
+      role="status"
       class="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4"
     >
       <p class="rounded-lg border border-[#000000] bg-slate-900/95 px-4 py-2 text-sm font-medium text-slate-100 shadow-lg">
@@ -1037,12 +1042,16 @@ onBeforeUnmount(() => {
   .mobile-tabs {
     display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
     position: fixed; inset: auto 0 0; z-index: 40;
-    padding: 0 1rem calc(.5rem + env(safe-area-inset-bottom));
+    padding: 0 1rem;
     background: rgb(255 255 255 / 80%);
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
   }
   .mobile-tabs button {
     background: transparent;
-    min-height: 3rem; border: 1px solid #000; border-bottom: 0;
+    min-height: calc(3.5rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(.5rem + env(safe-area-inset-bottom));
+    border: 1px solid #000; border-bottom: 0;
     border-radius: .75rem .75rem 0 0;
     font-size: .875rem; font-weight: 600;
   }
