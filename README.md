@@ -97,3 +97,10 @@ shortcuts sign --mode anyone --input shortcuts/share-to-froggy-link.unsigned.sho
 - 小於 Tailwind `lg`（1024px）使用固定底部頁籤與滿寬內容區；以 CSS 單一文件捲動讓新增區先滑出，不使用 JavaScript 捲動接管。桌面仍使用頁籤區內捲動。
 - 標籤列支援水平捲動，溢出時仍保留 `...`；已選標籤依原排序移到前方，取消選取即恢復原位置。
 - 手動更新预覽成功但沒有圖片時，會將該筆收藏的圖片欄位存為空字串，不再沿用舊截圖；網路請求失敗則保留原資料。未操作更新的舊收藏不變。
+
+## Google 地圖分享預覽
+
+- 跟隨 Google 地圖短連結重新導向，讀取 Open Graph 與 `itemprop` 的名稱、敘述和圖片。
+- 頁面只回傳通用「Google Maps／Google 地圖」時，從 `/maps/place/` 或 `query`／`q` 取得地點標示；地址僅保留來源實際提供的文字，不猜測。
+- 通用頁面的圖片可能指向伺服器所在地而非分享地點，因此不顯示這類圖片。沒有呼叫付費 Places API。
+- 舊收藏可按「更新預覽」取得新結果，無須清除 IndexedDB。

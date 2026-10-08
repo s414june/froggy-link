@@ -714,15 +714,18 @@ onBeforeUnmount(() => {
                     {{ editingId === item.id ? '取消' : '編輯' }}
                   </button>
                   </template>
-                <img
-                  v-if="previewSource(item) && failedPreviewImages[item.id] !== previewSource(item)"
-                  :src="previewSource(item)"
-                  alt="連結預覽圖"
-                  class="mt-2 aspect-square w-full rounded-md border border-slate-200 bg-white object-contain p-1"
-                  loading="lazy"
-                  referrerpolicy="no-referrer"
-                  @error="failedPreviewImages[item.id] = previewSource(item)"
-                >
+                <div class="card-preview mt-2 overflow-hidden rounded-md border border-slate-200 bg-white p-1">
+                  <img
+                    v-if="previewSource(item) && failedPreviewImages[item.id] !== previewSource(item)"
+                    :src="previewSource(item)"
+                    alt="連結預覽圖"
+                    class="aspect-square w-full object-contain"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    @error="failedPreviewImages[item.id] = previewSource(item)"
+                  >
+                  <LinkPreviewText v-else :description="item.description" :title="item.title" :url="item.url" />
+                </div>
                 <button
                   v-if="previewUpdateEnabled && editingId === item.id"
                   type="button"
@@ -995,6 +998,12 @@ onBeforeUnmount(() => {
     flex: none; overflow-y: visible; min-height: auto; padding: 0;
     grid-template-columns: minmax(0, 1fr); gap: 0;
     margin-inline: -1rem;
+  }
+  .card-preview {
+    margin-inline: -1rem;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
   }
   .link-list > li {
     margin: 0; border: 0; border-radius: 0;

@@ -1,3 +1,4 @@
+import { isGoogleMapsUrl, googleMapsUrlLabel, isGenericMapsTitle, cleanMapsTitle } from './google-maps.ts'
 import { linkDisplayText } from '../../app/utils/link-display.ts'
 import { instagramPostUrl } from '../../app/utils/instagram.ts'
 import { decodeHTML, decodeHTMLAttribute } from 'entities'
@@ -20,7 +21,7 @@ const trimMatch = (value: string | undefined) => {
 
 // Parse quoted attribute values before decoding entities so encoded quotes
 // cannot terminate an attribute or truncate the post text.
-const extractMetaValue = (html: string, key: string, attr: 'property' | 'name') => {
+const extractMetaValue = (html: string, key: string, attr: 'property' | 'name' | 'itemprop') => {
   const tags = html.match(/<meta\b(?:"[^"]*"|'[^']*'|[^'">])*>/gi) ?? []
   for (const tag of tags) {
     const attributes: Record<string, string> = {}
@@ -56,18 +57,32 @@ const toAbsoluteUrl = (targetUrl: string, value: string) => {
 const parseFromHtml = (html: string, targetUrl: string): LinkMetadata => {
   let title = extractMetaValue(html, 'og:title', 'property')
     || extractMetaValue(html, 'twitter:title', 'name')
+    || extractMetaValue(html, 'name', 'itemprop')
     || extractTitle(html)
 
-  const description = extractMetaValue(html, 'og:description', 'property')
+  let description = extractMetaValue(html, 'og:description', 'property')
     || extractMetaValue(html, 'description', 'name')
     || extractMetaValue(html, 'twitter:description', 'name')
+    || extractMetaValue(html, 'description', 'itemprop')
 
-  const imageUrl = toAbsoluteUrl(
+  let imageUrl = toAbsoluteUrl(
     targetUrl,
     extractMetaValue(html, 'og:image', 'property')
       || extractMetaValue(html, 'twitter:image', 'name')
+      || extractMetaValue(html, 'image', 'itemprop')
   )
 
+  if (isGoogleMapsUrl(targetUrl)) {
+    const itemName = extractMetaValue(html, 'name', 'itemprop')
+    if (isGenericMapsTitle(title) && !isGenericMapsTitle(itemName)) title = itemName
+    if (isGenericMapsTitle(title)) {
+      title = googleMapsUrlLabel(targetUrl)
+      // Generic Maps pages may show the server's location, not the shared place.
+      description = ''
+      imageUrl = ''
+    }
+    else title = cleanMapsTitle(title)
+  }
   if (instagramPostUrl(targetUrl)) {
     title = extractMetaValue(html, 'twitter:title', 'name') || title
   }
@@ -246,6 +261,11 @@ export const resolveLinkMetadata = async (targetUrl: string): Promise<LinkMetada
   }
   catch {
     // A page failure must not prevent the provider fallback.
+  }
+
+  if (isGoogleMapsUrl(targetUrl) || isGoogleMapsUrl(resolvedUrl)) {
+    if (isGenericMapsTitle(metadata.title)) metadata.title = googleMapsUrlLabel(resolvedUrl) || googleMapsUrlLabel(targetUrl)
+    return metadata
   }
 
   try {
