@@ -80,9 +80,29 @@ const filterTags = computed(() => selectedTagsFirst(allTags.value, selectedTagFi
 const orderedPickerTags = computed(() => selectedTagsFirst(tagPickerItems.value, tagPickerMode.value === 'filter' ? selectedTagFilters.value : formTags.value))
 const editingId = ref('')
 const isBatchMode = ref(false)
+const VIEW_MODE_STORAGE_KEY = 'froggy-link-view-mode-v1'
 const gridView = ref(false)
+const detailId = ref('')
+const actionsId = ref('')
+const actionsItem = computed(() => links.value.find(item => item.id === actionsId.value))
+const detailItem = computed(() => links.value.find(item => item.id === detailId.value))
+const displayedLinks = computed(() => detailItem.value ? [detailItem.value] : filteredLinks.value)
+const openDetail = (id: string) => {
+  detailId.value = id
+  cancelEdit()
+}
+const closeDetail = () => {
+  detailId.value = ''
+  cancelEdit()
+}
+const loadViewMode = () => {
+  try { gridView.value = localStorage.getItem(VIEW_MODE_STORAGE_KEY) === 'grid' }
+  catch { /* Use list view when browser storage is unavailable. */ }
+}
 const toggleGridView = () => {
   gridView.value = !gridView.value
+  try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, gridView.value ? 'grid' : 'list') }
+  catch { /* Switching views still works without persistent storage. */ }
   cancelEdit()
 }
 const selectedLinkIds = ref<string[]>([])
@@ -103,7 +123,6 @@ const toggleBatchMode = () => {
   isBatchMode.value = !isBatchMode.value
   selectedLinkIds.value = []
   if (isBatchMode.value) {
-    gridView.value = false
     cancelEdit()
   }
 }
@@ -430,6 +449,7 @@ onMounted(async () => {
   const standalone = window.matchMedia('(display-mode: standalone)').matches
     || (navigator as Navigator & { standalone?: boolean }).standalone === true
   isIosBrowser.value = ios && !standalone
+  loadViewMode()
   loadPreviewUpdateSetting()
   loadTagOrderMap()
   window.addEventListener('resize', scheduleLayoutMeasurements)
@@ -626,7 +646,8 @@ onBeforeUnmount(() => {
 
         <section class="tab-panel flex min-h-0 flex-1 flex-col rounded-b-xl rounded-tr-xl rounded-tl-none border border-[#000000] bg-surface p-4 shadow-sm md:p-5">
         <template v-if="activeTab === 'links'">
-          <div class="mb-4 space-y-2">
+          <button v-if="detailItem" type="button" class="mb-4 self-start rounded-md border border-black px-3 py-2 text-sm" @click="closeDetail"><span aria-hidden="true">←</span> 返回格子預覽</button>
+          <div v-else class="mb-4 space-y-2">
             <div class="flex items-center gap-2">
               <div
                 ref="filterTagsRowRef"
@@ -696,9 +717,17 @@ onBeforeUnmount(() => {
             載入中...
           </p>
 
-          <ul v-else-if="filteredLinks.length > 0 && gridView" class="preview-grid grid min-h-0 flex-1 grid-cols-3 content-start gap-1 overflow-y-auto" aria-label="格子預覽">
-            <li v-for="item in filteredLinks" :key="item.id" class="min-w-0">
-              <a :href="item.url" :aria-label="item.title || item.url" target="_blank" rel="noopener noreferrer" class="block aspect-square overflow-hidden bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2">
+          <ul v-else-if="filteredLinks.length > 0 && gridView && !detailItem" class="preview-grid grid min-h-0 flex-1 grid-cols-3 content-start gap-1 overflow-y-auto" aria-label="格子預覽">
+            <li v-for="item in filteredLinks" :key="item.id" class="relative min-w-0">
+              <input
+                v-if="isBatchMode"
+                type="checkbox"
+                :checked="selectedLinkIds.includes(item.id)"
+                :aria-label="`選取 ${item.title || item.url}`"
+                class="absolute right-2 top-2 z-10 h-6 w-6 cursor-pointer accent-primary"
+                @change="toggleSelectItem(item.id)"
+              >
+              <LinkGridTile :label="item.title || item.url" @open="isBatchMode ? toggleSelectItem(item.id) : openDetail(item.id)" @actions="!isBatchMode && (actionsId = item.id)">
                 <img
                   v-if="previewSource(item) && failedPreviewImages[item.id] !== previewSource(item)"
                   :src="previewSource(item)"
@@ -709,13 +738,13 @@ onBeforeUnmount(() => {
                   @error="failedPreviewImages[item.id] = previewSource(item)"
                 >
                 <LinkPreviewText v-else compact :description="item.description" :title="item.title" :url="item.url" />
-              </a>
+              </LinkGridTile>
             </li>
           </ul>
 
-          <ul v-else-if="filteredLinks.length > 0" class="link-list grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start items-start gap-3 overflow-y-auto pr-1 min-[480px]:grid-cols-2">
+          <ul v-else-if="displayedLinks.length > 0" :class="{ 'single-link': detailItem }" class="link-list grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start items-start gap-3 overflow-y-auto pr-1 min-[480px]:grid-cols-2">
             <li
-              v-for="item in filteredLinks"
+              v-for="item in displayedLinks"
               :key="item.id"
               class="min-w-0 rounded-lg border border-slate-300 bg-surface-soft p-3"
             >
@@ -857,6 +886,8 @@ onBeforeUnmount(() => {
         </section>
       </div>
     </div>
+
+    <LinkActionsDialog v-if="actionsItem" :url="actionsItem.url" @close="actionsId = ''" @notice="showShareHint" />
 
     <nav class="mobile-tabs" aria-label="主要頁籤">
       <button type="button" :aria-current="activeTab === 'links' ? 'page' : undefined" :class="{ 'text-primary': activeTab === 'links' }" @click="activeTab = 'links'">連結清單</button>
@@ -1007,6 +1038,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .mobile-tabs { display: none; }
+.link-list.single-link { grid-template-columns: minmax(0, 1fr); }
 @media (width < 1024px) {
   .app-shell {
     max-width: none;
