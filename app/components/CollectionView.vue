@@ -1044,6 +1044,8 @@ onBeforeUnmount(() => {
 .collection-toolbar {
   position: sticky; top: 0; z-index: 30;
   background: white; padding-block: .5rem;
+  margin-inline: -1.25rem;
+  padding-inline: 1.25rem;
 }
 .mobile-tabs { display: none; }
 .link-list.single-link { grid-template-columns: minmax(0, 1fr); }
@@ -1059,6 +1061,7 @@ onBeforeUnmount(() => {
   .tab-workspace { height: auto; min-height: 0; flex: 1; }
   .desktop-tabs { display: none; }
   .tab-panel { border-radius: 0; border: 0; padding: 1rem; box-shadow: none; }
+  .collection-toolbar { margin-inline: -1rem; padding-inline: 1rem; }
   /* One document scroll: the add form leaves first, then the list follows.
      No inner vertical scroll or JS scroll handoff on mobile. */
   .link-list {
