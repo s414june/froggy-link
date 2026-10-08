@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { linkDisplayText } from '~/utils/link-display'
 
-const props = defineProps<{ url: string, title: string, description: string }>()
+const props = defineProps<{ url: string, title: string, description: string, defaultExpanded?: boolean }>()
 const text = computed(() => linkDisplayText(props.url, props.title, props.description))
-const expanded = ref(false)
+const expanded = ref(props.defaultExpanded ?? false)
 const titleBox = ref<HTMLElement>()
 const urlBox = ref<HTMLElement>()
 const urlOverflow = ref(false)
@@ -20,7 +20,7 @@ const measure = () => {
   descriptionOverflow.value = !!descriptionBox.value && descriptionBox.value.scrollHeight > descriptionBox.value.clientHeight + 1
 }
 watch(text, async () => {
-  expanded.value = false
+  expanded.value = props.defaultExpanded ?? false
   await nextTick()
   measure()
 })
@@ -56,7 +56,7 @@ onBeforeUnmount(() => {
     <div ref="descriptionBox" :class="{ 'collapsed-text': !expanded, 'faded-text': !expanded && descriptionOverflow }">
       <p v-if="text.description" class="whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-slate-700">{{ text.description }}</p>
     </div>
-    <button v-if="overflowing || expanded" type="button" :aria-expanded="expanded" :aria-controls="contentId" class="rounded-md py-2 text-sm font-medium text-primary underline underline-offset-2" @click="toggle">{{ expanded ? '收合內容' : '展開全文' }}</button>
+    <button v-if="overflowing || expanded || defaultExpanded" type="button" :aria-expanded="expanded" :aria-controls="contentId" class="rounded-md py-2 text-sm font-medium text-primary underline underline-offset-2" @click="toggle">{{ expanded ? '收合內容' : '展開全文' }}</button>
   </div>
 </template>
 
