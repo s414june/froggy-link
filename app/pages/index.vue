@@ -855,8 +855,8 @@ onBeforeUnmount(() => {
     </div>
 
     <nav class="mobile-tabs" aria-label="主要頁籤">
-      <button type="button" :aria-current="activeTab === 'links' ? 'page' : undefined" :class="{ 'text-primary bg-primary/10': activeTab === 'links' }" @click="activeTab = 'links'">連結清單</button>
-      <button type="button" :aria-current="activeTab === 'map' ? 'page' : undefined" :class="{ 'text-primary bg-primary/10': activeTab === 'map' }" @click="activeTab = 'map'">地圖點位</button>
+      <button type="button" :aria-current="activeTab === 'links' ? 'page' : undefined" :class="{ 'text-primary': activeTab === 'links' }" @click="activeTab = 'links'">連結清單</button>
+      <button type="button" :aria-current="activeTab === 'map' ? 'page' : undefined" :class="{ 'text-primary': activeTab === 'map' }" @click="activeTab = 'map'">地圖點位</button>
     </nav>
 
     <div
@@ -1037,13 +1037,15 @@ onBeforeUnmount(() => {
   .mobile-tabs {
     display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
     position: fixed; inset: auto 0 0; z-index: 40;
-    padding: .5rem 1rem calc(.5rem + env(safe-area-inset-bottom));
-    background: white;
+    padding: 0 1rem calc(.5rem + env(safe-area-inset-bottom));
+    background: rgb(255 255 255 / 80%);
   }
   .mobile-tabs button {
+    background: transparent;
     min-height: 3rem; border: 1px solid #000; border-bottom: 0;
     border-radius: .75rem .75rem 0 0;
     font-size: .875rem; font-weight: 600;
   }
+  .mobile-tabs button[aria-current="page"] { background: white; }
 }
 </style>
