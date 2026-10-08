@@ -991,17 +991,26 @@ onBeforeUnmount(() => {
   .tab-panel { border-radius: 0; border: 0; padding: 1rem; box-shadow: none; }
   /* One document scroll: the add form leaves first, then the list follows.
      No inner vertical scroll or JS scroll handoff on mobile. */
-  .link-list { flex: none; overflow-y: visible; min-height: auto; padding-right: 0; grid-template-columns: minmax(0, 1fr); }
+  .link-list {
+    flex: none; overflow-y: visible; min-height: auto; padding: 0;
+    grid-template-columns: minmax(0, 1fr); gap: 0;
+    margin-inline: -1rem;
+  }
+  .link-list > li {
+    margin: 0; border: 0; border-radius: 0;
+    background: white; padding: 1rem;
+  }
   .map-panel { height: auto; overflow-y: visible; min-height: 50dvh; }
   .mobile-tabs {
-    display: grid; grid-template-columns: 1fr 1fr;
+    display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;
     position: fixed; inset: auto 0 0; z-index: 40;
     padding: .5rem 1rem calc(.5rem + env(safe-area-inset-bottom));
     background: white;
-    border: 1px solid #000;
-    border-bottom: 0;
-    border-radius: .75rem .75rem 0 0;
   }
-  .mobile-tabs button { min-height: 3rem; border-radius: .75rem; font-size: .875rem; font-weight: 600; }
+  .mobile-tabs button {
+    min-height: 3rem; border: 1px solid #000; border-bottom: 0;
+    border-radius: .75rem .75rem 0 0;
+    font-size: .875rem; font-weight: 600;
+  }
 }
 </style>
