@@ -1,4 +1,4 @@
-import { applyPreviewRefresh } from '~/utils/preview-refresh'
+import { applyPreviewRefresh, applyRepeatedLinkPreview } from '~/utils/preview-refresh'
 import type { LocationQuery } from 'vue-router'
 import type { LinkItem } from '~/types/link'
 import { fetchLinkMetadata } from '~/utils/link-metadata'
@@ -259,24 +259,14 @@ export const useLinks = () => {
     try {
       if (existingItem) {
         const mergedTags = normalizeTags([...existingItem.tags, ...inputTags])
-        const hasTagDiff = mergedTags.length !== normalizeTags(existingItem.tags).length
         // Re-adding a link also refreshes text saved by older metadata parsers.
         const metadata = await fetchLinkMetadata(normalizedUrl)
 
-        if (hasTagDiff || metadata?.title || metadata?.description || metadata?.imageUrl) {
-          const updatedItem: LinkItem = {
-            ...existingItem,
-            title: metadata?.title || existingItem.title,
-            description: metadata?.description || existingItem.description,
-            imageUrl: metadata.succeeded ? metadata.imageUrl : existingItem.imageUrl,
-            tags: mergedTags
-          }
-
-          await upsertLink(updatedItem)
-          links.value = links.value
-            .map((item) => (item.id === updatedItem.id ? updatedItem : item))
-            .sort((a, b) => b.createdAt - a.createdAt)
-        }
+        const updatedItem = applyRepeatedLinkPreview(existingItem, metadata, mergedTags)
+        await upsertLink(updatedItem)
+        links.value = links.value
+          .map((item) => (item.id === updatedItem.id ? updatedItem : item))
+          .sort((a, b) => b.createdAt - a.createdAt)
 
         resetForm()
         return

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { applyPreviewRefresh } from '../app/utils/preview-refresh.ts'
+import { toStoredLink } from '../app/utils/link-storage.ts'
 import { resolveLinkMetadata } from '../server/utils/link-metadata.ts'
 import { googleMapsUrlLabel, isGoogleMapsUrl } from '../server/utils/google-maps.ts'
 
@@ -32,5 +34,11 @@ test('shared Not Just Library link recovers its full place and address from redi
     Object.defineProperty(response, 'url', { value: `https://www.google.com/maps/place/${encodeURIComponent(label)}/data=!4m2` })
     return response
   })
-  assert.deepEqual(await resolveLinkMetadata('https://maps.app.goo.gl/EHYdfi84qGFML6Hu7?g_st=ac'), { title: label, description: '', imageUrl: '' })
+  const url = 'https://maps.app.goo.gl/EHYdfi84qGFML6Hu7?g_st=ac'
+  const metadata = await resolveLinkMetadata(url)
+  assert.deepEqual(metadata, { title: label, description: '', imageUrl: '' })
+  const saved = { id: 'maps', url, title: 'Google Maps', description: 'Find local businesses', imageUrl: 'https://example.com/old-map.png', tags: ['台北'], createdAt: 123 }
+  assert.deepEqual(toStoredLink(applyPreviewRefresh(saved, { ...metadata, succeeded: true })), {
+    ...saved, ...metadata, metadataVersion: 1
+  })
 })

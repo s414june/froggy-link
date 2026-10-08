@@ -16,10 +16,21 @@ export const applyPreviewRefresh = (current: LinkItem, metadata: PreviewResult):
   }
   return {
     ...current,
-    title: metadata.title || current.title,
-    description: metadata.description || current.description,
+    title: metadata.title,
+    // A successful preview may intentionally have no description.
+    description: metadata.description,
     // Empty is an intentional result, not a reason to restore an old screenshot.
     imageUrl: metadata.imageUrl,
     metadataVersion: 1
   }
+}
+
+
+// Re-adding can still merge tags if the preview is unavailable, but uses the
+// exact same replacement rules as the explicit refresh whenever it succeeds.
+export const applyRepeatedLinkPreview = (current: LinkItem, metadata: PreviewResult, tags: string[]): LinkItem => {
+  let updated = current
+  try { updated = applyPreviewRefresh(current, metadata) }
+  catch { /* Retain the preview while allowing the user's tags to be saved. */ }
+  return { ...updated, tags }
 }

@@ -80,6 +80,11 @@ const filterTags = computed(() => selectedTagsFirst(allTags.value, selectedTagFi
 const orderedPickerTags = computed(() => selectedTagsFirst(tagPickerItems.value, tagPickerMode.value === 'filter' ? selectedTagFilters.value : formTags.value))
 const editingId = ref('')
 const isBatchMode = ref(false)
+const gridView = ref(false)
+const toggleGridView = () => {
+  gridView.value = !gridView.value
+  cancelEdit()
+}
 const selectedLinkIds = ref<string[]>([])
 const failedPreviewImages = ref<Record<string, string>>({})
 const retryPreview = async (id: string) => {
@@ -98,6 +103,7 @@ const toggleBatchMode = () => {
   isBatchMode.value = !isBatchMode.value
   selectedLinkIds.value = []
   if (isBatchMode.value) {
+    gridView.value = false
     cancelEdit()
   }
 }
@@ -644,13 +650,12 @@ onBeforeUnmount(() => {
                   ...
                 </button>
                 <button
+                  v-if="isBatchMode"
                   type="button"
-                  class="rounded-md border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 transition hover:border-primary hover:text-primary"
-                  :class="isBatchMode ? 'border-primary bg-primary/10 text-primary' : ''"
+                  class="rounded-md border border-black bg-white px-3 py-1 text-xs text-primary"
                   @click="toggleBatchMode"
-                >
-                  {{ isBatchMode ? '完成' : '多選' }}
-                </button>
+                >完成</button>
+                <CollectionActions v-else :grid="gridView" @select="toggleBatchMode" @toggle-view="toggleGridView" />
               </div>
             </div>
 
@@ -686,6 +691,23 @@ onBeforeUnmount(() => {
           <p v-if="loading" class="text-sm text-muted">
             載入中...
           </p>
+
+          <ul v-else-if="filteredLinks.length > 0 && gridView" class="preview-grid grid min-h-0 flex-1 grid-cols-3 content-start gap-1 overflow-y-auto" aria-label="格子預覽">
+            <li v-for="item in filteredLinks" :key="item.id" class="min-w-0">
+              <a :href="item.url" :aria-label="item.title || item.url" target="_blank" rel="noopener noreferrer" class="block aspect-square overflow-hidden bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:-outline-offset-2">
+                <img
+                  v-if="previewSource(item) && failedPreviewImages[item.id] !== previewSource(item)"
+                  :src="previewSource(item)"
+                  alt="連結預覽圖"
+                  class="aspect-square w-full object-cover"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  @error="failedPreviewImages[item.id] = previewSource(item)"
+                >
+                <LinkPreviewText v-else compact :description="item.description" :title="item.title" :url="item.url" />
+              </a>
+            </li>
+          </ul>
 
           <ul v-else-if="filteredLinks.length > 0" class="link-list grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start items-start gap-3 overflow-y-auto pr-1 min-[480px]:grid-cols-2">
             <li
@@ -1009,6 +1031,8 @@ onBeforeUnmount(() => {
     margin: 0; border: 0; border-radius: 0;
     background: white; padding: 1rem;
   }
+  .link-list > li:not(:last-child) { border-bottom: 1px solid #e2e8f0; }
+  .preview-grid { flex: none; overflow-y: visible; margin-inline: -1rem; }
   .map-panel { height: auto; overflow-y: visible; min-height: 50dvh; }
   .mobile-tabs {
     display: grid; grid-template-columns: 1fr 1fr; gap: .5rem;

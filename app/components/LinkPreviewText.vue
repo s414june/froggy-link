@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { previewText } from '~/utils/preview-text'
 
-const props = defineProps<{ description: string, title: string, url: string }>()
+const props = defineProps<{ description: string, title: string, url: string, compact?: boolean }>()
 const snippet = computed(() => previewText(props.description, props.title, props.url))
 </script>
 
 <template>
-  <div class="text-preview" role="img" :aria-label="snippet.text">
+  <div class="text-preview" :class="{ compact }" role="img" :aria-label="snippet.text">
     <div class="text-preview-grid" aria-hidden="true">
       <span v-for="(character, index) in snippet.characters" :key="index" :class="{ wide: character.wide, ellipsis: character.text === '...' }">{{ character.text }}</span>
     </div>
@@ -49,4 +49,5 @@ const snippet = computed(() => previewText(props.description, props.title, props
 @media (width >= 1024px) {
   .text-preview { --preview-padding: 1.5rem; }
 }
+.text-preview.compact { --preview-padding: .375rem; }
 </style>

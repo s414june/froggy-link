@@ -47,7 +47,7 @@ onBeforeUnmount(() => {
   <div :id="contentId" class="min-w-0 space-y-1">
     <div class="flex items-start justify-between gap-3">
       <div ref="titleBox" class="min-w-0 break-words [overflow-wrap:anywhere]" :class="{ 'collapsed-title': !expanded, 'faded-text': !expanded && titleOverflow }">
-        <a :href="url" target="_blank" rel="noopener noreferrer" class="text-base font-semibold text-primary underline-offset-2 hover:underline">{{ text.title }}</a>
+        <a :href="url" target="_blank" rel="noopener noreferrer" class="text-base font-semibold text-primary underline-offset-2 hover:underline">{{ text.title || url }}</a>
       </div>
       <slot name="edit" />
     </div>
