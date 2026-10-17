@@ -13,12 +13,22 @@ const descriptionOverflow = ref(false)
 const overflowing = computed(() => titleOverflow.value || descriptionOverflow.value || urlOverflow.value)
 const contentId = useId()
 let observer: ResizeObserver | undefined
-const measure = () => {
-  if (expanded.value) return
-  urlOverflow.value = !!urlBox.value && urlBox.value.scrollHeight > urlBox.value.clientHeight + 1
-  titleOverflow.value = !!titleBox.value && titleBox.value.scrollHeight > titleBox.value.clientHeight + 1
-  descriptionOverflow.value = !!descriptionBox.value && descriptionBox.value.scrollHeight > descriptionBox.value.clientHeight + 1
+const exceedsCollapsedHeight = (box: HTMLElement | undefined, className: string) => {
+  if (!box) return false
+  const alreadyCollapsed = box.classList.contains(className)
+  // Measure using the same CSS limit even when initially expanded. Restore
+  // synchronously before paint, so short detail pages do not get a dead toggle.
+  if (!alreadyCollapsed) box.classList.add(className)
+  const exceeds = box.scrollHeight > box.clientHeight + 1
+  if (!alreadyCollapsed) box.classList.remove(className)
+  return exceeds
 }
+const measure = () => {
+  urlOverflow.value = exceedsCollapsedHeight(urlBox.value, 'collapsed-url')
+  titleOverflow.value = exceedsCollapsedHeight(titleBox.value, 'collapsed-title')
+  descriptionOverflow.value = exceedsCollapsedHeight(descriptionBox.value, 'collapsed-text')
+}
+
 watch(text, async () => {
   expanded.value = props.defaultExpanded ?? false
   await nextTick()
@@ -56,7 +66,7 @@ onBeforeUnmount(() => {
     <div ref="descriptionBox" :class="{ 'collapsed-text': !expanded, 'faded-text': !expanded && descriptionOverflow }">
       <p v-if="text.description" class="whitespace-pre-line break-words [overflow-wrap:anywhere] text-sm text-slate-700">{{ text.description }}</p>
     </div>
-    <button v-if="overflowing || expanded || defaultExpanded" type="button" :aria-expanded="expanded" :aria-controls="contentId" class="rounded-md py-2 text-sm font-medium text-primary underline underline-offset-2" @click="toggle">{{ expanded ? '收合內容' : '展開全文' }}</button>
+    <button v-if="overflowing" type="button" :aria-expanded="expanded" :aria-controls="contentId" class="rounded-md py-2 text-sm font-medium text-primary underline underline-offset-2" @click="toggle">{{ expanded ? '收合內容' : '展開全文' }}</button>
   </div>
 </template>
 

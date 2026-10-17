@@ -42,12 +42,36 @@ const {
   saveLink,
   toggleTagFilter,
   updateLinkTags,
+  addTagToLinks,
+  removeTagsFromSelectedLinks,
   selectedTagFilters,
+  searchQuery,
   loadTagOrderMap
 } = useLinks()
 
 const isIosBrowser = ref(false)
 const receivedSharedLink = ref(false)
+const AUTO_ADD_SHARED_LINK_STORAGE_KEY = 'froggy-link-auto-add-shared-link-v1'
+const autoAddSharedLink = ref(false)
+const isAndroid = ref(false)
+const shareTagInput = ref<HTMLInputElement>()
+const highlightShareTags = ref(false)
+let shareReady = false
+const loadShareSetting = () => {
+  try { autoAddSharedLink.value = localStorage.getItem(AUTO_ADD_SHARED_LINK_STORAGE_KEY) === 'true' }
+  catch { autoAddSharedLink.value = false }
+}
+const saveShareSetting = () => {
+  try { localStorage.setItem(AUTO_ADD_SHARED_LINK_STORAGE_KEY, String(autoAddSharedLink.value)) }
+  catch { showShareHint('無法儲存設定，本次開啟期間仍會套用。') }
+}
+const promptShareTags = async () => {
+  highlightShareTags.value = false
+  await nextTick()
+  shareTagInput.value?.focus({ preventScroll: true })
+  highlightShareTags.value = true
+}
+
 const clipboardMessage = ref('')
 
 const copyLinkForPwa = async () => {
@@ -78,8 +102,6 @@ const previewSource = (item: { url: string, imageUrl?: string }) => {
   const post = instagramPostUrl(item.url)
   return post ? `/api/instagram-image?url=${encodeURIComponent(post)}` : item.imageUrl || ''
 }
-const formKnownTags = computed(() => selectedTagsFirst(allTags.value, formTags.value))
-const filterTags = computed(() => selectedTagsFirst(allTags.value, selectedTagFilters.value))
 const orderedPickerTags = computed(() => selectedTagsFirst(tagPickerItems.value, tagPickerMode.value === 'filter' ? selectedTagFilters.value : formTags.value))
 const editingId = ref('')
 const isBatchMode = ref(false)
@@ -120,7 +142,41 @@ const allVisibleSelected = computed(() => {
 })
 const hasSelectedLinks = computed(() => selectedLinkIds.value.length > 0)
 
+const batchTagInput = ref('')
+const batchTagInputElement = ref<HTMLInputElement>()
+const syncBatchTagInput = (event: Event) => {
+  // v-model waits for compositionend; enable the action for text already shown
+  // by a Chinese/Japanese IME, even before the user leaves the input.
+  batchTagInput.value = (event.target as HTMLInputElement).value
+}
+
+const addingBatchTag = ref(false)
+const addTagToSelection = async () => {
+  if (addingBatchTag.value) return
+  const tag = (batchTagInputElement.value?.value ?? batchTagInput.value).trim()
+  if (!hasSelectedLinks.value) {
+    showShareHint('請先勾選要新增標籤的收藏。')
+    return
+  }
+  if (!tag) {
+    showShareHint('請先輸入要新增的標籤。')
+    batchTagInputElement.value?.focus()
+    return
+  }
+  addingBatchTag.value = true
+  try {
+    const count = await addTagToLinks([...selectedLinkIds.value], tag)
+    if (count !== undefined) {
+      batchTagInput.value = ''
+      showShareHint(count ? `已為 ${count} 筆收藏新增標籤！` : '已選收藏已不存在，未新增標籤。')
+    }
+  }
+  finally { addingBatchTag.value = false }
+}
+
 const toggleBatchMode = () => {
+  if (addingBatchTag.value) return
+  batchTagInput.value = ''
   isBatchMode.value = !isBatchMode.value
   selectedLinkIds.value = []
   if (isBatchMode.value) {
@@ -159,8 +215,27 @@ const toggleSelectAllVisible = () => {
   selectedLinkIds.value = [...nextSet]
 }
 
+const removeTagsFromSelection = async () => {
+  if (addingBatchTag.value || !isBatchMode.value || !selectedTagFilters.value.length) return
+  if (!hasSelectedLinks.value) {
+    showShareHint('請先勾選要移除標籤的收藏。')
+    return
+  }
+  const ids = [...selectedLinkIds.value]
+  const tags = [...selectedTagFilters.value]
+  addingBatchTag.value = true
+  try {
+    const count = await removeTagsFromSelectedLinks(ids, tags)
+    if (count !== undefined) {
+      selectedLinkIds.value = selectedLinkIds.value.filter(id => !ids.includes(id))
+      showShareHint(count ? `已從 ${count} 筆收藏移除篩選標籤！` : '已選收藏沒有符合的標籤。')
+    }
+  }
+  finally { addingBatchTag.value = false }
+}
+
 const deleteSelectedLinks = async () => {
-  if (!isBatchMode.value || selectedLinkIds.value.length === 0) {
+  if (addingBatchTag.value || !isBatchMode.value || selectedLinkIds.value.length === 0) {
     return
   }
 
@@ -206,12 +281,8 @@ const tagPickerItems = ref<string[]>([])
 const shareHintMessage = ref('')
 const tagRowRefs = ref<Record<string, HTMLElement | null>>({})
 const tagOverflowById = ref<Record<string, boolean>>({})
-const formKnownTagsRowRef = ref<HTMLElement | null>(null)
 const formSelectedTagsRowRef = ref<HTMLElement | null>(null)
-const filterTagsRowRef = ref<HTMLElement | null>(null)
-const formKnownTagsOverflow = ref(false)
 const formSelectedTagsOverflow = ref(false)
-const filterTagsOverflow = ref(false)
 const previewUpdateEnabled = ref(true)
 let shareHintTimer: ReturnType<typeof window.setTimeout> | null = null
 let resizeMeasurementRafId: number | null = null
@@ -333,12 +404,8 @@ const setTagRowRef = (id: string, el: Element | null) => {
 }
 
 const updateTagOverflow = () => {
-  formKnownTagsOverflow.value = !!formKnownTagsRowRef.value
-    && formKnownTagsRowRef.value.scrollWidth > formKnownTagsRowRef.value.clientWidth + 1
   formSelectedTagsOverflow.value = !!formSelectedTagsRowRef.value
     && formSelectedTagsRowRef.value.scrollWidth > formSelectedTagsRowRef.value.clientWidth + 1
-  filterTagsOverflow.value = !!filterTagsRowRef.value
-    && filterTagsRowRef.value.scrollWidth > filterTagsRowRef.value.clientWidth + 1
 
   const nextMap: Record<string, boolean> = {}
   for (const item of filteredLinks.value) {
@@ -424,7 +491,7 @@ watch(links, () => {
 }, { deep: true })
 
 const receiveSharedLink = async () => {
-  if (!hydrateFromShareQuery(route.query)) {
+  if (!shareReady || isDetailRoute.value || !hydrateFromShareQuery(route.query)) {
     return
   }
 
@@ -435,7 +502,18 @@ const receiveSharedLink = async () => {
   delete query.title
   await navigateTo({ path: route.path, query, hash: route.hash }, { replace: true })
   window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
-  showShareHint('設定標籤並按下新增！')
+  if (isAndroid.value && autoAddSharedLink.value) {
+    const result = await saveLink()
+    if (result === 'created' || result === 'duplicate') {
+      showShareHint(result === 'duplicate' ? '這個連結已經建立過囉！' : '已自動新增分享連結！')
+      return
+    }
+    showShareHint('自動新增未完成，請確認連結後再試。')
+  }
+  else {
+    showShareHint('設定標籤並按下新增！')
+  }
+  await promptShareTags()
 }
 
 watch(() => route.query, () => {
@@ -450,11 +528,14 @@ onMounted(async () => {
   const standalone = window.matchMedia('(display-mode: standalone)').matches
     || (navigator as Navigator & { standalone?: boolean }).standalone === true
   isIosBrowser.value = ios && !standalone
+  isAndroid.value = /Android/i.test(navigator.userAgent)
+  loadShareSetting()
   loadViewMode()
   loadPreviewUpdateSetting()
   loadTagOrderMap()
   window.addEventListener('resize', scheduleLayoutMeasurements)
   await loadLinks()
+  shareReady = true
   await receiveSharedLink()
   await nextTick()
   runLayoutMeasurements()
@@ -533,37 +614,16 @@ onBeforeUnmount(() => {
           <button type="button" class="rounded-lg border border-slate-300 px-3 py-2 text-base text-primary hover:bg-slate-50" @click="pasteLink">貼上連結</button>
           <p v-if="clipboardMessage" role="status" class="text-base text-slate-600">{{ clipboardMessage }}</p>
           <div class="space-y-2">
-            <div class="flex items-center gap-2">
-              <div
-                ref="formKnownTagsRowRef"
-                class="flex min-w-0 flex-1 flex-nowrap gap-2 overflow-x-auto overflow-y-hidden"
-              >
-                <button
-                  v-for="tag in formKnownTags"
-                  :key="`known-${tag}`"
-                  type="button"
-                  class="shrink-0 rounded-full border px-2 py-1 text-xs transition"
-                  :class="formTags.includes(tag)
-                    ? 'border-primary bg-primary/20 text-primary'
-                    : 'border-slate-300 text-slate-700 hover:border-primary'"
-                  @click="formTags.includes(tag) ? removeTagFromForm(tag) : addTagToForm(tag)"
-                >
-                  {{ tag }}
-                </button>
-              </div>
-              <button
-                v-if="formKnownTagsOverflow"
-                type="button"
-                class="shrink-0 px-1 text-xs text-slate-600 hover:text-slate-900"
-                @click="openTagPicker('form-known')"
-              >
-                ...
-              </button>
-            </div>
+            <SplitTagPicker :tags="allTags" :selected="formTags" label="新增區標籤" @toggle="tag => formTags.includes(tag) ? removeTagFromForm(tag) : addTagToForm(tag)" @more="openTagPicker('form-known')" />
 
             <div class="flex gap-2">
               <input
                 id="tag-input"
+                ref="shareTagInput"
+                aria-label="收藏標籤"
+                :class="{ 'share-tag-highlight': highlightShareTags }"
+                @animationend="highlightShareTags = false"
+                @input="highlightShareTags = false"
                 v-model="formTagInput"
                 type="text"
                 placeholder="輸入標籤後按 Enter 或空白"
@@ -652,32 +712,13 @@ onBeforeUnmount(() => {
         <template v-if="activeTab === 'links'">
           <button v-if="isDetailRoute" type="button" class="detail-back mb-4 self-start rounded-md border border-black px-3 py-2 text-sm" @click="closeDetail"><span aria-hidden="true">←</span> 返回格子預覽</button>
           <div v-else class="collection-toolbar mb-4 space-y-2">
+            <div class="flex items-center gap-2" role="search">
+              <input v-model="searchQuery" type="search" aria-label="搜尋收藏" placeholder="搜尋標題、敘述、網址或標籤" class="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary">
+              <button v-if="searchQuery" type="button" class="shrink-0 rounded-md px-2 py-2 text-sm text-slate-600" @click="searchQuery = ''">清除搜尋</button>
+            </div>
             <div class="flex items-center gap-2">
-              <div
-                ref="filterTagsRowRef"
-                class="flex min-w-0 flex-1 flex-nowrap items-center gap-2 overflow-x-auto overflow-y-hidden"
-              >
-                <button
-                  v-for="tag in filterTags"
-                  :key="`filter-${tag}`"
-                  class="shrink-0 rounded-full border px-3 py-1 text-xs transition"
-                  :class="selectedTagFilters.includes(tag)
-                    ? 'border-primary bg-primary/20 text-primary'
-                    : 'border-slate-300 text-slate-700 hover:border-primary'"
-                  @click="toggleTagFilter(tag)"
-                >
-                  {{ tag }}
-                </button>
-              </div>
+              <SplitTagPicker :tags="allTags" :selected="selectedTagFilters" label="篩選標籤" @toggle="toggleTagFilter" @more="openTagPicker('filter')" />
               <div class="flex shrink-0 items-center gap-2">
-                <button
-                  v-if="filterTagsOverflow"
-                  type="button"
-                  class="px-1 text-xs text-slate-600 hover:text-slate-900"
-                  @click="openTagPicker('filter')"
-                >
-                  ...
-                </button>
                 <button
                   v-if="isBatchMode"
                   type="button"
@@ -700,8 +741,16 @@ onBeforeUnmount(() => {
                 {{ allVisibleSelected ? '取消全選' : '全選' }}
               </button>
               <button
+                v-if="selectedTagFilters.length"
                 type="button"
-                :disabled="!hasSelectedLinks"
+                :disabled="addingBatchTag"
+                :title="`移除已選收藏的篩選標籤：${selectedTagFilters.join('、')}`"
+                class="rounded-md border border-amber-500 bg-amber-50 px-3 py-1 text-xs text-amber-800 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                @click="removeTagsFromSelection"
+              >移除標籤</button>
+              <button
+                type="button"
+                :disabled="!hasSelectedLinks || addingBatchTag"
                 class="rounded-md border border-red-600 bg-red-50 px-3 py-1 text-xs text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
                 @click="deleteSelectedLinks"
               >
@@ -710,6 +759,10 @@ onBeforeUnmount(() => {
               <p class="text-xs text-slate-600">
                 已選 {{ selectedLinkIds.length }} 筆
               </p>
+              <form class="flex w-full min-w-0 items-center gap-2" @submit.prevent="addTagToSelection">
+                <input ref="batchTagInputElement" v-model="batchTagInput" type="text" @input="syncBatchTagInput" @change="syncBatchTagInput" @keydown.enter="event => { if (event.isComposing) event.preventDefault() }" aria-label="批次新增標籤" placeholder="新增標籤" :disabled="addingBatchTag" class="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-50">
+                <button type="submit" :disabled="addingBatchTag" class="shrink-0 rounded-md border border-primary bg-primary px-3 py-2 text-sm text-white disabled:cursor-not-allowed disabled:opacity-50">{{ addingBatchTag ? '處理中…' : '新增已選' }}</button>
+              </form>
             </div>
           </div>
 
@@ -872,7 +925,7 @@ onBeforeUnmount(() => {
           </ul>
 
           <p v-else class="text-sm text-muted">
-            {{ isDetailRoute ? '找不到這筆收藏，可能已被刪除，或不在這個裝置中。' : '尚未有連結，先貼上一筆並加上標籤吧。' }}
+            {{ isDetailRoute ? '找不到這筆收藏，可能已被刪除，或不在這個裝置中。' : (searchQuery.trim() || selectedTagFilters.length ? '沒有符合搜尋或標籤條件的收藏。' : '尚未有連結，先貼上一筆並加上標籤吧。') }}
           </p>
         </template>
 
@@ -946,6 +999,14 @@ onBeforeUnmount(() => {
               @change="savePreviewUpdateSetting"
             >
           </label>
+        </section>
+
+        <section class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
+          <label class="flex cursor-pointer items-center justify-between gap-3">
+            <span>分享連結自動新增</span>
+            <input v-model="autoAddSharedLink" type="checkbox" class="h-4 w-4 accent-primary" aria-describedby="auto-add-share-help" @change="saveShareSetting">
+          </label>
+          <p id="auto-add-share-help" class="mt-2 text-sm text-slate-500">僅適用 Android。開啟後，收到分享連結會直接收藏，不等待輸入標籤；之後仍可編輯標籤。</p>
         </section>
 
         <section class="mt-4 rounded-lg border border-slate-300 bg-slate-50 p-3 text-base leading-relaxed text-slate-700">
@@ -1041,6 +1102,15 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.share-tag-highlight { animation: share-tag-pulse .8s ease-in-out 4; }
+@keyframes share-tag-pulse {
+  0%, 100% { border-color: #16a34a; box-shadow: 0 0 0 0 rgb(22 163 74 / 0%); }
+  50% { border-color: #16a34a; box-shadow: 0 0 0 4px rgb(22 163 74 / 30%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .share-tag-highlight { animation: none; border-color: #16a34a; box-shadow: 0 0 0 3px rgb(22 163 74 / 25%); }
+}
+
 .collection-toolbar {
   position: sticky; top: 0; z-index: 30;
   background: white; padding-block: .5rem;

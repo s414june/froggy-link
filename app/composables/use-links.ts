@@ -1,9 +1,10 @@
+import { createLinkSearch } from '~/utils/link-search'
 import { linkIdentity } from '~/utils/link-identity'
 import { applyPreviewRefresh, applyRepeatedLinkPreview } from '~/utils/preview-refresh'
 import type { LocationQuery } from 'vue-router'
 import type { LinkItem } from '~/types/link'
 import { fetchLinkMetadata } from '~/utils/link-metadata'
-import { readAllLinks, removeLink, upsertLink } from '~/utils/link-db'
+import { readAllLinks, removeLink, upsertLink, appendTagToLinks, removeTagsFromLinks } from '~/utils/link-db'
 import { repairLegacyLink } from '~/utils/link-migration'
 
 const normalizeTag = (tag: string) => {
@@ -73,6 +74,7 @@ export const useLinks = () => {
   const formTags = ref<string[]>([])
 
   const selectedTagFilters = ref<string[]>([])
+  const searchQuery = ref('')
 
   const allTags = computed(() => {
     const tagSet = new Set<string>()
@@ -102,14 +104,22 @@ export const useLinks = () => {
     })
   })
 
-  const filteredLinks = computed(() => {
-    if (selectedTagFilters.value.length === 0) {
-      return links.value
+  // A deleted tag must not remain as an invisible active filter.
+  watch(allTags, (tags) => {
+    const available = new Set(tags)
+    const remaining = selectedTagFilters.value.filter(tag => available.has(tag))
+    if (remaining.length !== selectedTagFilters.value.length) {
+      selectedTagFilters.value = remaining
     }
+  })
 
-    return links.value.filter((item) => {
+  const filteredLinks = computed(() => {
+    const matchesSearch = createLinkSearch(searchQuery.value)
+    return links.value.filter(item => {
       const tags = normalizeTags(item.tags)
-      return selectedTagFilters.value.some((selectedTag) => tags.includes(selectedTag))
+      const matchesTags = selectedTagFilters.value.length === 0
+        || selectedTagFilters.value.some(tag => tags.includes(tag))
+      return matchesTags && matchesSearch(item)
     })
   })
 
@@ -294,6 +304,7 @@ export const useLinks = () => {
       await upsertLink(payload)
       links.value = [payload, ...links.value]
       resetForm()
+      return 'created' as const
     }
     catch (error) {
       errorMessage.value = error instanceof Error ? error.message : '儲存失敗。'
@@ -363,6 +374,38 @@ export const useLinks = () => {
     }
   }
 
+  const addTagToLinks = async (ids: string[], input: string) => {
+    errorMessage.value = ''
+    const tag = normalizeTag(input)
+    if (!tag || !ids.length) return 0
+    try {
+      const updated = await appendTagToLinks(ids, tag)
+      const updatedById = new Map(updated.map(item => [item.id, item]))
+      links.value = links.value.map(item => updatedById.get(item.id) ?? item)
+      if (updated.length) registerNewTags([tag])
+      return updated.length
+    }
+    catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '批次新增標籤失敗。'
+      return undefined
+    }
+  }
+
+  const removeTagsFromSelectedLinks = async (ids: string[], tags: string[]) => {
+    errorMessage.value = ''
+    if (!ids.length || !tags.length) return 0
+    try {
+      const updated = await removeTagsFromLinks(ids, tags)
+      const updatedById = new Map(updated.map(item => [item.id, item]))
+      links.value = links.value.map(item => updatedById.get(item.id) ?? item)
+      return updated.length
+    }
+    catch (error) {
+      errorMessage.value = error instanceof Error ? error.message : '批次移除標籤失敗。'
+      return undefined
+    }
+  }
+
   const hydrateFromShareQuery = (query: LocationQuery) => {
     const sharedUrl = parseQueryValue(query.url)
     const sharedText = parseQueryValue(query.text)
@@ -398,7 +441,10 @@ export const useLinks = () => {
     saveLink,
     toggleTagFilter,
     updateLinkTags,
+    addTagToLinks,
+    removeTagsFromSelectedLinks,
     selectedTagFilters,
+    searchQuery,
     loadTagOrderMap
   }
 }

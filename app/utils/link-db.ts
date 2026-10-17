@@ -1,3 +1,4 @@
+import { appendLinkTag, removeLinkTags } from '~/utils/link-tags'
 import type { LinkItem } from '~/types/link'
 import { toStoredLink } from '~/utils/link-storage'
 
@@ -78,3 +79,39 @@ export const removeLink = async (id: string) => {
     db.close()
   }
 }
+
+
+// Read and update within one transaction: retain other fields and either commit
+// every selected tag change or none of them.
+const updateTagsForLinks = async (ids: string[], update: (item: LinkItem) => LinkItem): Promise<LinkItem[]> => {
+  const db = await openDatabase()
+  try {
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction(LINK_STORE, 'readwrite')
+      const store = transaction.objectStore(LINK_STORE)
+      const updated: LinkItem[] = []
+      transaction.oncomplete = () => resolve(updated)
+      transaction.onabort = () => reject(transaction.error ?? new Error('批次更新標籤失敗，未套用變更。'))
+      for (const id of new Set(ids)) {
+        const request = store.get(id)
+        request.onsuccess = () => {
+          if (!request.result) return
+          try {
+            const item = update(request.result)
+            if (item === request.result) return
+            store.put(toStoredLink(item))
+            updated.push(item)
+          }
+          catch { transaction.abort() }
+        }
+      }
+    })
+  }
+  finally { db.close() }
+}
+
+export const appendTagToLinks = (ids: string[], tag: string) =>
+  updateTagsForLinks(ids, item => ({ ...appendLinkTag(item, tag) }))
+
+export const removeTagsFromLinks = (ids: string[], tags: string[]) =>
+  updateTagsForLinks(ids, item => removeLinkTags(item, tags))
